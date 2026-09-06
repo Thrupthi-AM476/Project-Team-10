@@ -14,15 +14,6 @@
 |---|---|---|---|
 | 1.0 | 06-09-2026 | Thrupthi G D | Initial SAD draft — architecture, components, tech stack |
 
-## Approvals
-
-| Role | Name | Signature / Date |
-|---|---|---|
-| Course Coordinator | | |
-| Team Lead | | |
-
----
-
 ## Table of Contents
 
 1. Introduction
