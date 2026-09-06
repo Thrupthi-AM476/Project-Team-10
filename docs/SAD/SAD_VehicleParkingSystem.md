@@ -2,7 +2,7 @@
 
 **Project:** Vehicle Parking System
 **Version:** 1.0
-**Authors:** Adithya Chanukumar (PE51UG24AM470)
+**Authors:** Thrupthi G D (PE51UG24AM476)
 **Date:** 06-09-2026
 **Status:** Draft
 
@@ -12,7 +12,7 @@
 
 | Version | Date | Author | Change Summary |
 |---|---|---|---|
-| 1.0 | 06-09-2026 | Adithya Chanukumar | Initial SAD draft — architecture, components, tech stack |
+| 1.0 | 06-09-2026 | Thrupthi G D | Initial SAD draft — architecture, components, tech stack |
 
 ## Approvals
 
