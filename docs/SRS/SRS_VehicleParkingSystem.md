@@ -14,14 +14,6 @@
 |---|---|---|---|---|
 | 1.0 | 06-09-2026 | Thrupthi G D | Initial SRS draft | Pending |
 
-## Approvals
-
-| Role | Name | Signature / Email | Date |
-|---|---|---|---|
-| Course Coordinator | | | |
-
----
-
 ## Table of Contents
 
 1. Introduction
