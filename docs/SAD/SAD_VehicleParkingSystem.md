@@ -237,8 +237,186 @@ The system is structured into four layers:
 
 ## 4. Design
 
-> **Status: In Progress** — Sequence diagrams and detailed API design to be added in the next revision.
-
 ### 4.1 Design Overview
 
 The VPS follows a request-response model for all terminal interactions. Each transaction (entry, exit, payment) is atomic — if any step fails, the system rolls back and notifies the user. All state changes (slot occupancy, payment status) are persisted to the database before hardware actions (barrier open) are triggered, ensuring consistency even during partial failures.
+
+---
+
+### 4.2 UML Sequence Diagrams
+
+#### Sequence Diagram 1 — Vehicle Entry Flow
+
+```
+Driver        Entry Terminal      API Gateway     Auth Service    Slot Manager     Database
+  |                 |                  |                |               |               |
+  |-- Insert Card ->|                  |                |               |               |
+  |                 |-- Capture LP --->|                |               |               |
+  |                 |                  |-- Validate --->|               |               |
+  |                 |                  |<-- Token OK ---|               |               |
+  |                 |                  |-- Assign Slot----------------->|               |
+  |                 |                  |                |               |-- Check DB -->|
+  |                 |                  |                |               |<-- Slot# ----|
+  |                 |                  |<-- Slot# + Ticket ID ----------|               |
+  |                 |                  |-- Save Entry Record --------------------------------->|
+  |                 |                  |<-- Saved --------------------------------------------|
+  |                 |<-- Print Ticket--|                |               |               |
+  |<-- Ticket + --- |                  |                |               |               |
+  |   Barrier Opens |                  |                |               |               |
+```
+
+> *To be replaced with a draw.io / PlantUML diagram in the final submission.*
+
+**Flow description:**
+1. Driver inserts card / presents vehicle at entry terminal.
+2. Terminal captures the license plate (ALPR or manual).
+3. API Gateway validates the session via Auth Service.
+4. Slot Manager checks the database for an available slot and assigns it.
+5. Entry record (LP, slot, timestamp, ticket ID) is saved to the database.
+6. Ticket is printed/displayed and the barrier opens.
+
+---
+
+#### Sequence Diagram 2 — Vehicle Exit & Payment Flow
+
+```
+Driver        Exit Terminal       API Gateway    Fee Calculator   Payment Service    Database
+  |                 |                  |                |                |               |
+  |-- Scan Ticket ->|                  |                |               |               |
+  |                 |-- Ticket ID ---->|                |               |               |
+  |                 |                  |-- Fetch Entry Record --------------------------->|
+  |                 |                  |<-- Entry Timestamp -----------------------------|
+  |                 |                  |-- Calculate Fee -------------->|               |
+  |                 |                  |<-- Fee Amount -----------------|               |
+  |                 |<-- Display Fee --|                |               |               |
+  |-- Select Payment|                  |                |               |               |
+  |   Method ------>|                  |                |               |               |
+  |                 |-- Process Payment|--------------->|-- Pay Req --->|               |
+  |                 |                  |                |               |-- Gateway --> |
+  |                 |                  |                |               |<-- Confirmed -|
+  |                 |                  |-- Update Exit Record -------------------------------->|
+  |                 |                  |<-- Saved ---------------------------------------------|
+  |                 |<-- Receipt ------|                |               |               |
+  |<-- Receipt + ---|                  |                |               |               |
+  |   Barrier Opens |                  |                |               |               |
+```
+
+> *To be replaced with a draw.io / PlantUML diagram in the final submission.*
+
+**Flow description:**
+1. Driver scans ticket at exit terminal.
+2. API Gateway fetches the original entry record from the database.
+3. Fee Calculator computes the charge based on duration and rate schedule.
+4. Fee is displayed; driver selects payment method.
+5. Payment Service processes the payment via the external gateway.
+6. Exit record is saved, receipt printed, and barrier opens.
+
+---
+
+### 4.3 API Design
+
+#### API 1 — Vehicle Entry
+
+**Endpoint:** `/api/v1/entry`
+**Method:** `POST`
+**Description:** Registers a vehicle entry, assigns a slot, and creates a ticket.
+
+**Request Body:**
+```json
+{
+  "licensePlate": "KA01AB1234",
+  "entryTerminalId": "TERM-01",
+  "captureMethod": "ALPR"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "ticketId": "TKT-20260906-00123",
+  "slotNumber": "B-14",
+  "slotType": "regular",
+  "entryTimestamp": "2026-09-06T10:32:00Z",
+  "status": "ENTRY_SUCCESS"
+}
+```
+
+**Error Responses:**
+
+| Code | Message | Reason |
+|---|---|---|
+| 409 | Parking Full | No slots available |
+| 400 | Invalid License Plate | LP format validation failed |
+| 503 | Terminal Offline | Network/DB unreachable |
+
+---
+
+#### API 2 — Vehicle Exit & Fee Calculation
+
+**Endpoint:** `/api/v1/exit`
+**Method:** `POST`
+**Description:** Processes vehicle exit — calculates fee, handles payment, and frees the slot.
+
+**Request Body:**
+```json
+{
+  "ticketId": "TKT-20260906-00123",
+  "exitTerminalId": "TERM-EXIT-01",
+  "paymentMethod": "CARD"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "ticketId": "TKT-20260906-00123",
+  "licensePlate": "KA01AB1234",
+  "entryTimestamp": "2026-09-06T10:32:00Z",
+  "exitTimestamp": "2026-09-06T13:15:00Z",
+  "durationMinutes": 163,
+  "amountCharged": 82.00,
+  "currency": "INR",
+  "paymentStatus": "SUCCESS",
+  "receiptId": "RCP-20260906-00123",
+  "status": "EXIT_SUCCESS"
+}
+```
+
+**Error Responses:**
+
+| Code | Message | Reason |
+|---|---|---|
+| 404 | Ticket Not Found | Invalid or already used ticket ID |
+| 402 | Payment Failed | Gateway declined or insufficient funds |
+| 400 | Invalid Request | Missing required fields |
+
+---
+
+### 4.4 Error Handling, Logging & Monitoring
+
+- All API errors return a consistent JSON structure: `{ "error": "<code>", "message": "<description>", "timestamp": "..." }`
+- No sensitive data (license plates in plaintext, PANs, PINs) is written to logs.
+- Structured logs (JSON format) shipped to ELK Stack for monitoring.
+- Key metrics monitored: transaction failure rate, barrier open/close latency, API response times, slot occupancy percentage.
+- Alerts triggered for: payment gateway downtime, > 5% transaction failure rate, system unavailability.
+
+---
+
+### 4.5 UX Design
+
+- Entry/exit terminal UI uses large touch targets (minimum 44×44px), high-contrast colour scheme, and audio prompts for accessibility.
+- Language selection available at terminal start screen.
+- Admin portal is fully responsive and keyboard-navigable.
+- All error messages are user-friendly (no raw error codes shown to customers).
+
+---
+
+### 4.6 Open Issues & Next Steps
+
+| # | Issue / Enhancement | Priority |
+|---|---|---|
+| 1 | Integrate biometric authentication for admin access | Medium |
+| 2 | Add QR-code based mobile entry/exit | Low |
+| 3 | Support multi-level parking floor management | Medium |
+| 4 | Finalise vendor selection for ALPR camera | High |
+| 5 | Replace ASCII diagrams with draw.io/PlantUML exports | High |

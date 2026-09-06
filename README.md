@@ -3,8 +3,7 @@
 | Field | Details |
 |---|---|
 | **Project** | Vehicle Parking System |
-| **Student ID** | PE51UG24AM476 |
-| **Member** | Thrupthi G D |
+| **Team** | Team 10 |
 | **Version** | 1.0 |
 | **Status** | Draft |
 | **Date** | 06-09-2026 |
@@ -24,15 +23,12 @@ Project-Team-10/
     ├── README.md              ← Docs index
     │
     ├── SRS/
-    │   ├── README.md
     │   └── SRS_VehicleParkingSystem.md
     │
     ├── SAD/
-    │   ├── README.md
     │   └── SAD_VehicleParkingSystem.md
     │
     └── STP/
-        ├── README.md
         └── STP_VehicleParkingSystem.md
 ```
 
@@ -46,6 +42,7 @@ Project-Team-10/
 
 ## Revision History
 
-| Version | Date | Author | Change Summary |
-|---|---|---|---|
-| 1.0 | 06-09-2026 | Thrupthi G D | Initial draft — SRS, SAD, STP created |
+| Version | Date | Change Summary |
+|---|---|---|
+| 1.0 | 06-09-2026 | Initial draft — SRS and SAD created |
+| 1.1 | 06-09-2026 | SAD sequence diagrams added |
