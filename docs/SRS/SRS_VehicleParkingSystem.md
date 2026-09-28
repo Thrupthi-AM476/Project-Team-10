@@ -12,7 +12,8 @@
 
 | Version | Date | Author | Change Summary | Approval |
 |---|---|---|---|---|
-| 1.0 | 06-09-2026 | Thrupthi G D | Initial SRS draft | Pending |
+| 1.0 | 06-09-2026 | Team 10 | Initial SRS draft | Pending |
+| 1.1 | 28-09-2026 | Team 10 | Added PlantUML use-case diagrams | Pending |
 
 ## Table of Contents
 
@@ -249,39 +250,77 @@ Web-based admin portal (modern browsers), embedded terminal software at entry/ex
 
 ### 7.1 Use-Case Diagram 1 — Customer Parking Flow
 
-```
-+----------------------------------------------------------+
-|                  Vehicle Parking System                  |
-|                                                          |
-|   [Enter Parking Lot] <---- Driver/Customer              |
-|   [View Slot Availability] <---- Driver/Customer         |
-|   [Make Reservation] <---- Driver/Customer               |
-|   [Pay Parking Fee] <---- Driver/Customer                |
-|   [Exit Parking Lot] <---- Driver/Customer               |
-|   [Get Receipt] <---- Driver/Customer                    |
-|                                                          |
-+----------------------------------------------------------+
-```
+```plantuml
+@startuml
+left to right direction
+actor "Driver / Customer" as Driver
+actor "Parking Attendant" as Attendant
 
-> *To be replaced with a PlantUML / draw.io diagram in the final submission.*
+rectangle "Vehicle Parking System" {
+  usecase "Enter Parking Lot" as UC1
+  usecase "View Slot Availability" as UC2
+  usecase "Make Reservation" as UC3
+  usecase "Pay Parking Fee" as UC4
+  usecase "Exit Parking Lot" as UC5
+  usecase "Get Receipt" as UC6
+  usecase "Manual Override Entry" as UC7
+}
+
+Driver --> UC1
+Driver --> UC2
+Driver --> UC3
+Driver --> UC4
+Driver --> UC5
+Driver --> UC6
+
+Attendant --> UC7
+UC7 .> UC1 : <<extends>>
+
+UC4 .> UC5 : <<include>>
+UC5 .> UC6 : <<include>>
+@enduml
+```
 
 ### 7.2 Use-Case Diagram 2 — Admin & Attendant Operations
 
-```
-+----------------------------------------------------------+
-|                  Vehicle Parking System                  |
-|                                                          |
-|   [View Occupancy Dashboard] <---- Administrator         |
-|   [Configure Rate Schedule] <---- Administrator          |
-|   [Generate Reports] <---- Administrator                 |
-|   [Manage User Accounts] <---- Administrator             |
-|   [Manual Barrier Override] <---- Parking Attendant      |
-|   [Log Maintenance Event] <---- Maintenance Technician   |
-|                                                          |
-+----------------------------------------------------------+
-```
+```plantuml
+@startuml
+left to right direction
+actor "System Administrator" as Admin
+actor "Parking Attendant" as Attendant
+actor "Maintenance Technician" as Tech
 
-> *To be replaced with a PlantUML / draw.io diagram in the final submission.*
+rectangle "Vehicle Parking System - Management" {
+  usecase "Login to Admin Portal" as UC1
+  usecase "View Occupancy Dashboard" as UC2
+  usecase "Configure Rate Schedule" as UC3
+  usecase "Generate Reports" as UC4
+  usecase "Manage User Accounts" as UC5
+  usecase "Manual Barrier Override" as UC6
+  usecase "View Transaction History" as UC7
+  usecase "Log Maintenance Event" as UC8
+  usecase "Run System Diagnostics" as UC9
+}
+
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC7
+
+Attendant --> UC1
+Attendant --> UC6
+Attendant --> UC7
+
+Tech --> UC8
+Tech --> UC9
+
+UC2 .> UC1 : <<include>>
+UC3 .> UC1 : <<include>>
+UC4 .> UC1 : <<include>>
+@enduml
+```
 
 ---
 
