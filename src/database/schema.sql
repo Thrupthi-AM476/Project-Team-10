@@ -1,7 +1,7 @@
 -- ============================================================
 -- Vehicle Parking System (VPS) — MySQL Database Schema
 -- Version: 1.0
--- Aligned with: SRS_VehicleParkingSystem.md
+-- Aligned with: SRS_VehicleParkingSystem.pdf
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS vehicle_parking_system
