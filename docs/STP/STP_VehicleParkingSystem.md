@@ -54,8 +54,8 @@ Testing covers all VPS features: vehicle entry/exit, slot management, fee calcul
 
 ### References
 
-- VPS SRS v1.0 — `docs/SRS/SRS_VehicleParkingSystem.md`
-- VPS SAD v1.0 — `docs/SAD/SAD_VehicleParkingSystem.md`
+- VPS SRS v1.0 — `docs/SRS/SRS_Vechicle_Parking_System.pdf`
+- VPS SAD v1.0 — `docs/SAD/SAD_VehicleParkingSystem.pdf`
 - PCI-DSS v4.0 Standards
 - WCAG 2.1 AA Guidelines
 
@@ -195,7 +195,7 @@ Features mapped to SRS requirement IDs:
 | Component | Version |
 |---|---|
 | VPS Application | v1.0 (build under test) |
-| Database | MySQL 8.x |
+| Database | MySQL 8.x (provisional assumption; confirm with implementation) |
 | Payment Gateway | Sandbox / mock environment |
 | ALPR Service | Mock service with pre-defined LP responses |
 | OS | Ubuntu 22.04 LTS (server), Windows 11 (admin workstation) |
@@ -209,7 +209,7 @@ Features mapped to SRS requirement IDs:
 | JMeter | Performance and load testing |
 | OWASP ZAP | Security / penetration testing |
 | Jira | Defect tracking and test management |
-| JUnit 5 | Unit testing (Java backend services) |
+| JUnit 5 | Unit testing (only if the implemented backend uses Java; confirm stack first) |
 
 ### Test Data
 
@@ -295,37 +295,50 @@ Features mapped to SRS requirement IDs:
 
 ## 13. Test Case Management & Traceability
 
-RTM ensures every SRS requirement maps to at least one test case.
+The Requirements Traceability Matrix (RTM) maps SRS requirements to test case IDs in `docs/TestCases/Vehicle_Parking_System_Test_Cases.xlsx`.
 
-| Req ID | Requirement Short | Test Case(s) |
-|---|---|---|
-| VPS-F-001 | Capture license plate | TC-ENT-01, TC-ENT-01B (manual fallback) |
-| VPS-F-002 | Assign and mark slot occupied | TC-ENT-02 |
-| VPS-F-003 | Generate entry ticket | TC-ENT-03 |
-| VPS-F-004 | Real-time slot availability display | TC-SLOT-01 |
-| VPS-F-005 | Slot categorisation | TC-SLOT-02 |
-| VPS-F-006 | Block entry when full | TC-SLOT-03 |
-| VPS-F-007 | Calculate parking fee | TC-EXIT-01, TC-EXIT-01B (peak rate) |
-| VPS-F-008 | Accept payment at exit | TC-EXIT-02 (card), TC-EXIT-02B (cash), TC-EXIT-02C (wallet) |
-| VPS-F-009 | Print/send receipt | TC-EXIT-03 |
-| VPS-F-010 | Mark slot available on exit | TC-EXIT-04 |
-| VPS-F-011 | Advance reservation | TC-RES-01 |
-| VPS-F-012 | Auto-release expired reservation | TC-RES-02 |
-| VPS-F-013 | Admin dashboard | TC-ADM-01 |
-| VPS-F-014 | Rate schedule configuration | TC-ADM-02 |
-| VPS-F-015 | Export reports | TC-ADM-03 |
-| VPS-NF-001 | Response time ≤ 5s | TC-PERF-01 |
-| VPS-NF-002 | 99.9% availability | TC-PERF-02 |
-| VPS-NF-003 | PCI-DSS compliance | TC-SEC-01 |
-| VPS-NF-004 | 5-year log retention | TC-OPS-01 |
-| VPS-NF-005 | WCAG 2.1 AA accessibility | TC-UX-01 |
-| VPS-SR-001 | TLS 1.2+ | TC-SEC-01 |
-| VPS-SR-002 | Password complexity | TC-SEC-02 |
-| VPS-SR-003 | RBAC enforcement | TC-SEC-03 |
-| VPS-SR-004 | Account lockout | TC-SEC-04 |
-| VPS-SR-005 | AES-256 at rest | TC-SEC-05 |
+**Test ID convention:** The spreadsheet's canonical test case identifiers are `TC-001` through `TC-040`. The test case workbook records planned tests only; all cases remain **Not Executed** until run against an implementation or suitable test environment.
 
----
+| Req ID | Requirement Short | Test Case(s) | Traceability Notes |
+|---|---|---|---|
+| VPS-F-001 | Capture license plate | TC-001, TC-002, TC-003, TC-036 | Automatic capture, manual entry, validation case, and entry integration. TC-003 validation rules need confirmation. |
+| VPS-F-002 | Assign slot and mark occupied | TC-004, TC-005, TC-036, TC-038 | Allocation, occupied-slot protection, entry integration, and concurrent allocation. |
+| VPS-F-003 | Generate entry ticket | TC-006, TC-036 | Ticket details and entry integration. |
+| VPS-F-004 | Display real-time slot availability | TC-007, TC-040 | Availability display and capacity-boundary state. |
+| VPS-F-005 | Categorise parking slots | TC-008 | EV-eligible slot assignment; admin configuration coverage may need a separate case. |
+| VPS-F-006 | Block entry when parking is full | TC-009, TC-040 | Full-capacity rejection and final-slot boundary. |
+| VPS-F-007 | Calculate parking fee | TC-010, TC-011, TC-037 | Standard fee, rate boundary, and exit integration. Concrete rate schedule and rounding rules need definition. |
+| VPS-F-008 | Process payment at exit | TC-012, TC-013, TC-014, TC-037 | Successful payment, failed payment, gateway failure, and exit integration. |
+| VPS-F-009 | Generate and deliver receipt | TC-015, TC-037 | Receipt content and exit integration. |
+| VPS-F-010 | Mark slot available on exit | TC-016, TC-037 | Slot release and exit integration. TC-037 verifies this only if the final slot state is observed. |
+| VPS-F-011 | Advance reservation | TC-018, TC-019 | Reservation creation and overlapping reservation conflict; overlap rules need confirmation. |
+| VPS-F-012 | Auto-release expired reservation | TC-020 | Automatic release after grace-period expiry. |
+| VPS-F-013 | Admin occupancy dashboard | TC-021 | Dashboard case. TC-022 is not counted as coverage unless history search is confirmed in the approved SRS. |
+| VPS-F-014 | Configure rate schedule | TC-023, TC-024 | Rate configuration and invalid-rate handling; invalid-input rules need definition. |
+| VPS-F-015 | Export reports | TC-025, TC-039 | Export format/content and non-admin export denial, provided report export is in the approved SRS. |
+| VPS-NF-001 | Transaction response time ≤ 5 seconds | TC-026 | Define transaction mix, concurrency, data volume, duration, environment, and measurement method. |
+| VPS-NF-002 | 99.9% system availability | TC-027 | Short test windows cannot establish monthly availability; use a defined observation period and supporting evidence. |
+| VPS-NF-003 | PCI-DSS compliance | TC-028 | Limited check for plaintext payment data only; this is not proof of full PCI-DSS compliance. |
+| VPS-NF-004 | 5-year audit-log retention | TC-029 | Configuration evidence only unless actual retention behaviour can be demonstrated. |
+| VPS-NF-005 | WCAG 2.1 AA accessibility | TC-030 | Define the pages, criteria, tools, and evidence; a limited manual check does not prove full conformance. |
+| VPS-SR-001 | TLS 1.2+ on connections | TC-031 | Test all applicable endpoints, not only a single endpoint. |
+| VPS-SR-002 | Password complexity policy | TC-032 | Obtain explicit policy rules and test examples before execution. |
+| VPS-SR-003 | RBAC enforcement | TC-033, TC-039 | Role permission checks and report-export authorization, if export is in scope. |
+| VPS-SR-004 | Account lockout after 5 failed attempts | TC-034 | Lockout behaviour; duration and recovery behaviour need clarification if required. |
+| VPS-SR-005 | AES-256 encryption at rest | TC-035 | Verify evidence of the specified AES-256 configuration; a generic protected-at-rest setting is insufficient. |
+
+### Traceability items requiring clarification
+
+- **TC-017 — Invalid parking ticket at exit:** The SRS describes ticket validation generally but does not provide a dedicated requirement ID or explicit acceptance criterion for invalid-ticket rejection. Do not map it to `VPS-F-010`, which concerns slot release. Keep the case pending clarification or approval as an additional test.
+- **TC-003 — Invalid/empty plate:** Confirm the accepted license-plate format and expected behaviour for blank input.
+- **TC-008 — Vehicle-category slot assignment:** Confirm whether admin configuration of slot categories requires a separate test.
+- **TC-010/TC-011/TC-023/TC-024 — Rate handling:** Define concrete rates, rounding, boundary inclusivity, and invalid schedule rules before execution.
+- **TC-019 — Reservation conflicts:** Confirm the rule for overlapping reservation windows.
+- **TC-022 — Vehicle/parking history search:** Do not count this as required coverage until its inclusion in the approved SRS is confirmed.
+- **TC-026 to TC-030 — Non-functional requirements:** Confirm the measurement plan and evidence required for performance, availability, payment-data handling, retention, and accessibility.
+- **TC-032/TC-034 — Authentication policy details:** Confirm password rules and account-lockout duration/recovery behaviour where the SRS does not specify them.
+- **TC-036 to TC-040 — Integration, concurrency, and boundary cases:** Treat these as supplementary scenarios. Count them toward a requirement only when their steps and expected results explicitly verify that requirement.
+- **Coverage status:** A mapping indicates planned coverage, not successful verification. A requirement should be reported as verified only after relevant tests have been executed, passed, and supported by recorded evidence.
 
 ## 14. Test Metrics & Reporting
 
