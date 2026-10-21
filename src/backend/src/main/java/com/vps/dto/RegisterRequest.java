@@ -1,6 +1,5 @@
 package com.vps.dto;
 
-import com.vps.entity.User.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -27,7 +26,4 @@ public class RegisterRequest {
     private String password;
 
     private String phone;
-
-    // Default CUSTOMER; admin can create other roles
-    private Role role = Role.CUSTOMER;
 }
