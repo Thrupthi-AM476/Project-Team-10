@@ -52,20 +52,21 @@ public class VehicleController {
 
     // GET /api/v1/vehicles/{id}
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<VehicleResponse>> getVehicle(@PathVariable Long id) {
-        // reuse search by id — find in all active vehicles
-        VehicleResponse vehicle = vehicleService.getAllVehicles().stream()
-                .filter(v -> v.getId().equals(id))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + id));
+    public ResponseEntity<ApiResponse<VehicleResponse>> getVehicle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        User user = authService.getUserByEmail(userDetails.getUsername());
+        VehicleResponse vehicle = vehicleService.getVehicleById(id, user);
         return ResponseEntity.ok(ApiResponse.success("Vehicle retrieved", vehicle));
     }
 
     // GET /api/v1/vehicles/search?plate=KA01AB1234
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<VehicleResponse>> searchByPlate(
-            @RequestParam String plate) {
-        VehicleResponse vehicle = vehicleService.getByLicensePlate(plate);
+            @RequestParam String plate,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        User user = authService.getUserByEmail(userDetails.getUsername());
+        VehicleResponse vehicle = vehicleService.getByLicensePlate(plate, user);
         return ResponseEntity.ok(ApiResponse.success("Vehicle found", vehicle));
     }
 
