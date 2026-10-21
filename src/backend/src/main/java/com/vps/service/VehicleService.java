@@ -50,6 +50,39 @@ public class VehicleService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Ownership-aware lookup by ID.
+     * CUSTOMER may only see their own vehicle; ADMINISTRATOR and PARKING_ATTENDANT may see any.
+     */
+    public VehicleResponse getVehicleById(Long vehicleId, User requester) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + vehicleId));
+
+        if (requester.getRole() == User.Role.CUSTOMER
+                && !vehicle.getUser().getId().equals(requester.getId())) {
+            throw new SecurityException("Not authorized to view this vehicle");
+        }
+
+        return toResponse(vehicle);
+    }
+
+    /**
+     * Ownership-aware lookup by plate.
+     * Preserves the zero-argument overload used by ParkingService / ReservationService.
+     */
+    public VehicleResponse getByLicensePlate(String licensePlate, User requester) {
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(licensePlate.toUpperCase())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Vehicle not found: " + licensePlate));
+
+        if (requester.getRole() == User.Role.CUSTOMER
+                && !vehicle.getUser().getId().equals(requester.getId())) {
+            throw new SecurityException("Not authorized to view this vehicle");
+        }
+
+        return toResponse(vehicle);
+    }
+
     public VehicleResponse updateVehicle(Long vehicleId, VehicleRequest request, User requester) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
@@ -84,7 +117,8 @@ public class VehicleService {
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
 
         if (!vehicle.getUser().getId().equals(requester.getId())
-                && requester.getRole() != User.Role.ADMINISTRATOR) {
+                && requester.getRole() != User.Role.ADMINISTRATOR
+                && requester.getRole() != User.Role.PARKING_ATTENDANT) {
             throw new SecurityException("Not authorized to delete this vehicle");
         }
 

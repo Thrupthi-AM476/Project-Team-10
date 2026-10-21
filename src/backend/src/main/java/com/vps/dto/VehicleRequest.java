@@ -9,7 +9,7 @@ import lombok.Data;
 public class VehicleRequest {
 
     @NotBlank(message = "License plate is required")
-    @Pattern(regexp = "^[A-Z0-9\\-]{2,20}$", message = "Invalid license plate format")
+    @Pattern(regexp = "^[A-Za-z0-9\\-]{2,20}$", message = "License plate must be 2-20 alphanumeric or hyphen characters")
     private String licensePlate;
 
     private String make;

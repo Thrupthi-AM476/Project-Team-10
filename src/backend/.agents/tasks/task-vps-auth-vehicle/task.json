@@ -1,0 +1,7 @@
+{
+  "task_id": "task-vps-auth-vehicle",
+  "task_description": "Complete and secure Issues #20 (User Registration/Login/Profile) and #3 (Vehicle Registration) for the Vehicle Parking System Spring Boot backend. Covers: role hardcoding on registration, transactional auth, duplicate-email protection, inactive-account enforcement, user profile endpoints (GET/PUT /api/v1/users/me), vehicle ownership checks on getById and searchByPlate, PARKING_ATTENDANT deactivation permission, license plate pattern fix, GlobalExceptionHandler expansion, and a full test suite (unit + MockMvc integration).",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}
