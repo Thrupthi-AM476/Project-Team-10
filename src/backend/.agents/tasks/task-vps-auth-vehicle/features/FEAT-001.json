@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Infrastructure: add H2 test dependency to pom.xml, create application-test.properties, and expand GlobalExceptionHandler. These are prerequisites for all tests in FEAT-002 and FEAT-003 and for the inactive-account 403 fix. Independent of FEAT-002 and FEAT-003 ordering — must come first because tests in later FEATs depend on H2 and the corrected exception mappings.",
+  "status": "completed",
+  "steps": [
+    "Add H2 in-memory database dependency to pom.xml with scope=test, version 2.2.224 (compatible with Spring Boot 3.3.4). Add it after the spring-security-test dependency block. File: c:\\Users\\thrup\\OneDrive\\Desktop\\SE\\Project-Team-10\\src\\backend\\pom.xml.",
+    "Create src/main/resources/application-test.properties with: spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE, spring.datasource.driver-class-name=org.h2.Driver, spring.datasource.username=sa, spring.datasource.password=, spring.jpa.database-platform=org.hibernate.dialect.H2Dialect, spring.jpa.hibernate.ddl-auto=create-drop, app.jwt.secret=test-secret-key-for-vps-unit-tests-must-be-256-bits-long-padding, app.jwt.expiration-ms=3600000, app.cors.allowed-origins=http://localhost:3000, logging.level.com.vps=WARN. File: c:\\Users\\thrup\\OneDrive\\Desktop\\SE\\Project-Team-10\\src\\backend\\src\\main\\resources\\application-test.properties.",
+    "Modify GlobalExceptionHandler.java: (a) Fix IllegalStateException handler to return HttpStatus.FORBIDDEN (403) instead of CONFLICT (409) — this exception is used by AuthService for locked/inactive account rejections, and 403 is the correct HTTP status for a forbidden state. (b) Add handler for NoSuchElementException returning HttpStatus.NOT_FOUND (404). (c) Add handler for DataIntegrityViolationException (import org.springframework.dao.DataIntegrityViolationException) returning HttpStatus.CONFLICT (409) with message 'A record with the provided data already exists'. Never expose the underlying SQL or constraint name. File: c:\\Users\\thrup\\OneDrive\\Desktop\\SE\\Project-Team-10\\src\\backend\\src\\main\\java\\com\\vps\\controller\\GlobalExceptionHandler.java."
+  ],
+  "acceptance_criteria": [
+    "mvn compile exits 0 with no errors after all three changes.",
+    "GlobalExceptionHandler maps IllegalStateException to 403 FORBIDDEN.",
+    "GlobalExceptionHandler maps NoSuchElementException to 404 NOT_FOUND.",
+    "GlobalExceptionHandler maps DataIntegrityViolationException to 409 CONFLICT without exposing SQL details.",
+    "application-test.properties exists at src/main/resources/application-test.properties and specifies H2 in-memory datasource with ddl-auto=create-drop.",
+    "H2 dependency appears in pom.xml with scope=test."
+  ],
+  "verification": [
+    "cd c:\\Users\\thrup\\OneDrive\\Desktop\\SE\\Project-Team-10\\src\\backend && mvn compile — must exit 0 with BUILD SUCCESS."
+  ],
+  "blocked_reason": null,
+  "findings": "Two additional pom.xml changes were required beyond the three stated steps: (1) The system JDK is JDK 25 (Temurin 25.0.2). Starting with JDK 22, annotation processors are no longer auto-discovered from the compile classpath — Lombok must be declared explicitly as an annotation processor via maven-compiler-plugin annotationProcessorPaths. Without this, Lombok @Data, @RequiredArgsConstructor etc. generated no code, causing 'cannot find symbol' errors on all setter/constructor calls across the codebase. (2) Lombok 1.18.34 (the version Spring Boot 3.3.4 BOM pins) is incompatible with JDK 25 — it throws ExceptionInInitializerError (TypeTag::UNKNOWN) at compile time. Lombok 1.18.40 added JDK 25 support. The Lombok dependency version was explicitly overridden to 1.18.40 and the annotationProcessorPath version set to match. These changes are minimal and necessary for the build to succeed on the installed JDK; they do not affect runtime behavior."
+}
