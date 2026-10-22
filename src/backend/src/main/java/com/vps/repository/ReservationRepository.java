@@ -20,4 +20,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     // Check if a slot is already reserved in a given time window
     @Query("SELECT COUNT(r) > 0 FROM Reservation r WHERE r.slot.id = :slotId AND r.status IN ('PENDING','CONFIRMED') AND r.startTime < :end AND r.endTime > :start")
     boolean isSlotReservedInWindow(Long slotId, LocalDateTime start, LocalDateTime end);
+
+    @Query("SELECT COUNT(r) > 0 FROM Reservation r WHERE r.slot.id = :slotId "
+        + "AND r.status IN ('PENDING','CONFIRMED') "
+        + "AND r.startTime <= :at AND r.endTime > :at")
+boolean isSlotReservedAtTime(Long slotId, LocalDateTime at);
 }
