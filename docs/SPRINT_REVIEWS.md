@@ -1,133 +1,103 @@
 # Sprint Reviews and Retrospectives — Vehicle Parking System (Team 10)
 
 **Repository:** https://github.com/Thrupthi-AM476/Project-Team-10  
-**Team:** Thrupthi-AM476 · adik1611 · Vikas75bit · gaganreddy4656
+**Team:** Thrupthi-AM476 · adik1611 · Vikas75bit · gaganreddy4656  
+**Official timeline:** Sprint 1 (Oct 19-23) · Sprint 2 (Oct 26-30)
 
 ---
 
-## Sprint 1 — Core Application Foundation
+## Sprint 1 — Working Product (Oct 19-23)
 
-**Goal:** Establish backend core (auth, vehicles, database, security) and frontend project scaffolding.
+**Goal:** A demonstrable working parking system: register, login, manage vehicles, view parking availability, park a vehicle, exit and pay, view receipt. Includes CI pipeline, README, and an open PR for team review.
 
-**Planned issues:** #20, #3, #42, #26, #27, #28, #29 (32 story points)
+**Planned issues (18 open, 63 SP):**
 
-**Completed:**
-- ✅ #20 — User registration, login, profile management (backend + tests)
-- ✅ #3 — Vehicle registration with ownership enforcement (backend + tests)
-- ✅ #42 — Database schema, seed data, H2 test config
-- ✅ #26 — React + Vite frontend: components, API client, AuthContext, routing
-- ✅ #27 — Login and registration pages
-- ✅ #28 — Customer dashboard and profile page
-- ✅ #29 — Vehicle management UI
-
-**Key decisions made:**
-- Role is always hardcoded to CUSTOMER on registration (no privilege escalation possible)
-- H2 in-memory database used for tests; MySQL for production
-- BCrypt password hashing with Spring Security's `PasswordEncoder`
-- JWT with 24-hour expiry; no refresh token (academic scope)
-
-**Blockers:** None — all Sprint 1 items delivered
-
----
-
-## Sprint 2 — Parking Workflows
-
-**Goal:** Complete parking entry/exit/fee, slot management, reservations, and payment; connect frontend.
-
-**Planned issues:** #10, #11, #14, #15, #16, #25, #30, #31, #32, #37, #38, #39, #40 (49 story points)
-
-**Completed:**
-- ✅ #10 — Parking slot management endpoints (create/update/deactivate for staff)
-- ✅ #11 — Parking entry with ownership enforcement, ticket generation
-- ✅ #14 — Exit workflow: fee calculation (grace period, rate schedule), slot release
-- ✅ #15 — Payment entity (mock SUCCESS); receipt in exit response
-- ✅ #16 — Rate schedule CRUD (admin); reservations with conflict prevention
-- ✅ #25 — Security fix: public slot availability endpoint, efficient report query
-- ✅ #30 — Parking availability grid (color-coded, real-time)
-- ✅ #31 — Parking entry/ticket UI
-- ✅ #32 — Exit workflow and receipt UI
-- ✅ #37 — Reservation create/list/cancel UI
-- ✅ #38 — Staff dashboard with slot management
-- ✅ #39 — Reservation form with datetime pickers
-- ✅ #40 — Staff vehicle overview
-
-**In Progress / Carry-forward:**
-- 🔄 #40 — Staff dashboard refinements (vehicle listing table pagination)
-
-**Blockers:**
-- npm install required `strict-ssl=false` workaround due to corporate certificate (documented)
-
----
-
-## Sprint 3 — Completion and Quality
-
-**Goal:** Admin dashboard, remaining pages, full test coverage, CI, documentation, and demo readiness.
-
-**Planned issues:** #18, #19, #35, #41, #43, #44, #45, #46, #47, #48, #49 (30 story points)
-
-**Completed:**
-- ✅ #18 — Admin dashboard: real stats, revenue, rate config, date-filtered reports
-- ✅ #19 — Full test suite: 71 tests, 0 failures (AuthService×9, VehicleService×13, ParkingService×12, AuthController×7, UserController×5, VehicleController×9, ParkingController×8, AdminController×8)
-- ✅ #35 — Admin dashboard UI with stat cards, rate table, report table
-- ✅ #43 — GitHub Actions CI (backend test + frontend build)
-- ✅ #44 — Frontend-backend integration verified; CORS configured; error handling
-- ✅ #45 — README updated with full setup, API docs, demo walkthrough
-- ✅ #46 — Security audit: all RBAC boundaries and safe error messages verified
-- ✅ #41 — Admin dashboard UI (stat cards, reports)
-- ✅ #48 — Responsive layout and basic accessibility verified
-
-**In Progress:**
-- 🔄 #47 — Sprint review documentation (this file; ongoing)
-- 🔄 #49 — PR for final merge (see PR section below)
-
----
-
-## Retrospective — Overall Project
-
-### What Went Well
-- Backend architecture was clean and complete from the start
-- JWT + Spring Security integration worked without issues
-- H2 test database allowed 71 automated tests without MySQL dependency
-- React + Vite frontend builds in under 2 seconds
-- Ownership enforcement was comprehensive (vehicles, parking sessions, history)
-- GitHub Actions CI catches regressions automatically
-
-### What Could Be Improved
-- Issue bodies were initially empty — should be written at sprint start, not retroactively
-- Frontend npm install needed a `strict-ssl` workaround; team should document network constraints earlier
-- No frontend unit tests (Vitest/React Testing Library) — deferred due to time
-- Payment simulation should be more obviously labeled in the UI
-
-### Action Items for Future Projects
-- Write acceptance criteria for every issue before starting a sprint
-- Set up test coverage reporting (JaCoCo) from the beginning
-- Use feature flags for incomplete features rather than leaving them as stubs
-- Assign PR reviewers explicitly, not just after the fact
-
----
-
-## Individual Contribution Summary
-
-Based on actual Git commit history and GitHub issue assignments:
-
-| Teammate | Issues Owned | PRs Opened | Commits | Focus Area |
+| # | Issue | Assignee | SP | Status |
 |---|---|---|---|---|
-| Thrupthi-AM476 | #20, #3, #26-29, #32-35, #44, #48, #49 | PR#24, PR#current | Main contributor | Auth, vehicles, full frontend |
-| adik1611 | #10, #16, #36-40 | — | TBD | Slots, reservations, staff UI |
-| Vikas75bit | #11, #14, #15, #37-38 | — | TBD | Entry/exit, fee, payment, receipt |
-| gaganreddy4656 | #18, #19, #41-43, #45-47 | — | TBD | Admin, testing, CI, docs |
+| 20 | User registration, login, profile | Thrupthi-AM476 | 8 | Code implemented on feature branch |
+| 3 | Vehicle registration | Thrupthi-AM476 | 5 | Code implemented on feature branch |
+| 42 | Database schema and seed data | gaganreddy4656 | 2 | Schema in src/database/schema.sql |
+| 10 | Parking slot management | adik1611 | 5 | Code implemented on feature branch |
+| 11 | Parking allocation and entry | Vikas75bit | 5 | Code implemented on feature branch |
+| 14 | Vehicle exit and fee calculation | Vikas75bit | 5 | Code implemented on feature branch |
+| 15 | Payment and receipt | Vikas75bit | 3 | Code implemented on feature branch |
+| 25 | Fix slot availability and rate endpoints | — | 2 | Code implemented on feature branch |
+| 32 | Frontend setup | Thrupthi-AM476 | 3 | Code implemented on feature branch |
+| 33 | Login and registration pages | Thrupthi-AM476 | 3 | Code implemented on feature branch |
+| 34 | Customer dashboard | Thrupthi-AM476 | 3 | Code implemented on feature branch |
+| 35 | Vehicle management UI | Thrupthi-AM476 | 5 | Code implemented on feature branch |
+| 36 | Parking availability grid | adik1611 | 3 | Code implemented on feature branch |
+| 37 | Parking entry UI | Vikas75bit | 3 | Code implemented on feature branch |
+| 38 | Exit workflow UI | Vikas75bit | 3 | Code implemented on feature branch |
+| 43 | GitHub Actions CI | gaganreddy4656 | 2 | CI configured in .github/workflows/ci.yml |
+| 45 | README and setup docs | gaganreddy4656 | 2 | README updated on feature branch |
+| 49 | Merge PR for review | Thrupthi-AM476 | 1 | PR #50 open, awaiting review |
 
-**Note:** Contribution counts above reflect planned assignments. Actual commit counts should be verified using:
-```bash
-git shortlog -sn --no-merges
-```
+**Implementation status:** All code exists on branch `feat/fullstack-vps-development`. PR #50 is open. Backend tests: 71 passing, 0 failures. Frontend builds cleanly.
+
+**Sprint 1 deliverables checklist (per teacher's requirements):**
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| Working product | Implemented | 71 tests pass; frontend builds; code on feature branch |
+| GitHub Actions for PRs/commits | Configured | .github/workflows/ci.yml (backend test + frontend build) |
+| PRs raised by assigned members | Open | PR #50 from feat/fullstack-vps-development to main |
+| Repository-owner reviews | **PENDING** | PR #50 awaiting review by Thrupthi-AM476 |
+| 1-minute demonstration video | **NOT DONE** | Must be recorded and uploaded to repo |
+| Deviation documentation | **NOT DONE** | Must document any deviations from SRS/SAD/Test Plan |
+
+**Remaining Sprint 1 work:**
+- [ ] Repository-owner must review and approve PR #50
+- [ ] Record a 1-minute demo video and upload to the repository
+- [ ] Document any deviations from the submitted SRS/SAD/Test Plan (e.g., payment is simulated, no ALPR)
+- [ ] Add issues to the GitHub Projects V2 board and set Story Points/Sprint/Status fields (requires `project` token scope — see BACKLOG.md)
+
+**Workload flag:** Thrupthi-AM476 has 28 SP (44% of sprint total). This is high. The existing implementation is already on the feature branch, so the sprint work is review and coordination, not new coding. If the team agrees, consider reassigning #34 (3 SP) to another member.
 
 ---
 
-## Test Results (Sprint 3 Final)
+## Sprint 2 — Completion (Oct 26-30) — PLANNED, NOT STARTED
+
+**Goal:** Reservations, admin dashboard, staff dashboard, comprehensive testing, security audit, responsive design, and sprint documentation.
+
+**Planned issues (10 open, 47 SP):**
+
+| # | Issue | Assignee | SP | Status |
+|---|---|---|---|---|
+| 16 | Rate configuration and reservations | adik1611 | 8 | Not started |
+| 18 | Admin dashboard and reports | gaganreddy4656 | 5 | Not started |
+| 19 | Full test suite | gaganreddy4656 | 8 | Not started |
+| 39 | Reservations page UI | adik1611 | 5 | Not started |
+| 40 | Staff dashboard | adik1611 | 5 | Not started |
+| 41 | Admin dashboard UI | gaganreddy4656 | 5 | Not started |
+| 44 | Frontend-backend integration verification | Thrupthi-AM476 | 3 | Not started |
+| 46 | Security audit | gaganreddy4656 | 3 | Not started |
+| 47 | Sprint reviews and retrospectives | gaganreddy4656 | 2 | Not started |
+| 48 | Responsive layout and accessibility | Thrupthi-AM476 | 3 | Not started |
+
+**Note:** Some of this code already exists on the feature branch from initial development. Sprint 2 work involves reviewing, testing, hardening, and formally completing these features — not building from scratch.
+
+**Workload flag:** Vikas75bit has 0 SP planned. gaganreddy4656 has 23 SP (49%). Consider reassigning #46 (security audit, 3 SP) to Vikas75bit.
+
+---
+
+## Sprint 1 Retrospective (to be completed after Sprint 1 ends)
+
+### What went well
+- [To be filled in after Sprint 1 review meeting]
+
+### What could be improved
+- [To be filled in after Sprint 1 review meeting]
+
+### Action items
+- [To be filled in after Sprint 1 review meeting]
+
+---
+
+## Test Results (Current State)
 
 ```
-mvn test (from src/backend)
+cd src/backend && mvn test
 Tests run: 71, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
