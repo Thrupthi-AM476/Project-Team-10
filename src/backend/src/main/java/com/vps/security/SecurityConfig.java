@@ -43,6 +43,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 // Slot availability is public (entry terminal)
                 .requestMatchers(HttpMethod.GET, "/api/v1/parking/slots").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/parking/slots/available").permitAll()
                 // Admin-only endpoints
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMINISTRATOR")
                 // All other endpoints require authentication

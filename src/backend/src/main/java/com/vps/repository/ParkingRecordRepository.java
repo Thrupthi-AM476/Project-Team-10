@@ -17,6 +17,12 @@ public interface ParkingRecordRepository extends JpaRepository<ParkingRecord, Lo
     List<ParkingRecord> findByStatusOrderByEntryTimeDesc(RecordStatus status);
     List<ParkingRecord> findByEntryTimeBetweenOrderByEntryTimeDesc(LocalDateTime from, LocalDateTime to);
 
+    @Query("SELECT r FROM ParkingRecord r WHERE r.vehicle.user.id = :userId ORDER BY r.entryTime DESC")
+    List<ParkingRecord> findByVehicleUserIdOrderByEntryTimeDesc(Long userId);
+
+    @Query("SELECT r FROM ParkingRecord r WHERE r.vehicle.user.id = :userId AND r.status = 'ACTIVE' ORDER BY r.entryTime DESC")
+    List<ParkingRecord> findActiveByVehicleUserIdOrderByEntryTimeDesc(Long userId);
+
     @Query("SELECT COUNT(r) FROM ParkingRecord r WHERE r.status = 'ACTIVE'")
     long countActiveRecords();
 

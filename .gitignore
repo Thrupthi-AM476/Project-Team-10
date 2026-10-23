@@ -79,3 +79,7 @@ Desktop.ini
 test-results/
 surefire-reports/
 coverage/
+
+# --- Agent workflow artifacts ---
+.agents/
+semantic-review/

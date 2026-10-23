@@ -9,6 +9,7 @@ import com.vps.entity.Payment.PaymentMethod;
 import com.vps.entity.Payment.PaymentStatus;
 import com.vps.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class ParkingService {
     private final ParkingRecordRepository recordRepository;
     private final PaymentRepository paymentRepository;
     private final RateScheduleRepository rateScheduleRepository;
+    private final VehicleRepository vehicleRepository;
     private final VehicleService vehicleService;
     private final AuditLogService auditLogService;
 
@@ -48,6 +50,58 @@ public class ParkingService {
     }
 
     // ---------------------------------------------------------------
+    // VPS-F-005: Slot management (staff/admin)
+    // ---------------------------------------------------------------
+    @Transactional
+    public ParkingSlotResponse createSlot(ParkingSlotRequest request) {
+        if (slotRepository.findAll().stream()
+                .anyMatch(s -> s.getSlotNumber().equalsIgnoreCase(request.getSlotNumber()))) {
+            throw new IllegalArgumentException("Slot number already exists: " + request.getSlotNumber());
+        }
+
+        ParkingSlot slot = new ParkingSlot();
+        slot.setSlotNumber(request.getSlotNumber().toUpperCase());
+        slot.setSlotType(request.getSlotType());
+        slot.setFloor(request.getFloor() != null ? request.getFloor() : "G");
+        slot.setStatus(SlotStatus.AVAILABLE);
+
+        try {
+            slotRepository.save(slot);
+        } catch (DataIntegrityViolationException ex) {
+            throw new IllegalArgumentException("Slot number already exists: " + request.getSlotNumber());
+        }
+
+        return toSlotResponse(slot);
+    }
+
+    @Transactional
+    public ParkingSlotResponse updateSlot(Long slotId, ParkingSlotRequest request) {
+        ParkingSlot slot = slotRepository.findById(slotId)
+                .orElseThrow(() -> new IllegalArgumentException("Slot not found: " + slotId));
+
+        if (request.getSlotType() != null) {
+            slot.setSlotType(request.getSlotType());
+        }
+        if (request.getFloor() != null) {
+            slot.setFloor(request.getFloor());
+        }
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            slot.setStatus(SlotStatus.valueOf(request.getStatus().toUpperCase()));
+        }
+        slotRepository.save(slot);
+
+        return toSlotResponse(slot);
+    }
+
+    @Transactional
+    public void deactivateSlot(Long slotId) {
+        ParkingSlot slot = slotRepository.findById(slotId)
+                .orElseThrow(() -> new IllegalArgumentException("Slot not found: " + slotId));
+        slot.setStatus(SlotStatus.OUT_OF_SERVICE);
+        slotRepository.save(slot);
+    }
+
+    // ---------------------------------------------------------------
     // VPS-F-001 to VPS-F-003: Vehicle Entry
     // ---------------------------------------------------------------
     @Transactional
@@ -57,17 +111,18 @@ public class ParkingService {
         // Look up vehicle
         Vehicle vehicle = vehicleService.getEntityByLicensePlate(plate);
 
-        // Check vehicle not already parked
-        if (recordRepository.existsBySlotIdAndStatus(
-                vehicle.getId(), RecordStatus.ACTIVE)) {
-            // more precisely: check by vehicle
-            boolean alreadyParked = recordRepository
-                    .findByVehicleIdAndStatus(vehicle.getId(), RecordStatus.ACTIVE)
-                    .isPresent();
-            if (alreadyParked) {
-                throw new IllegalStateException(
-                        "Vehicle " + plate + " is already parked");
-            }
+        // VPS-SR-003: Ownership check — customers can only park their own vehicle
+        if (actor.getRole() == User.Role.CUSTOMER
+                && !vehicle.getUser().getId().equals(actor.getId())) {
+            throw new SecurityException("You can only park your own vehicle");
+        }
+
+        // Check vehicle not already parked — VPS-F-002 prevent duplicate active sessions
+        if (recordRepository
+                .findByVehicleIdAndStatus(vehicle.getId(), RecordStatus.ACTIVE)
+                .isPresent()) {
+            throw new IllegalStateException(
+                    "Vehicle " + plate + " is already parked");
         }
 
         // VPS-F-006: find available slot
@@ -128,6 +183,12 @@ public class ParkingService {
                     "Ticket " + request.getTicketId() + " is already completed or cancelled");
         }
 
+        // VPS-SR-003: Ownership check — customers can only exit their own parking session
+        if (actor.getRole() == User.Role.CUSTOMER
+                && !record.getVehicle().getUser().getId().equals(actor.getId())) {
+            throw new SecurityException("You can only process exit for your own vehicle");
+        }
+
         LocalDateTime exitTime = LocalDateTime.now();
         long minutes = ChronoUnit.MINUTES.between(record.getEntryTime(), exitTime);
 
@@ -183,6 +244,39 @@ public class ParkingService {
                 .stream().map(this::toHistoryResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Ownership-aware vehicle history lookup.
+     * CUSTOMER may only see history for their own vehicle; staff may see any.
+     */
+    public List<ParkingHistoryResponse> getParkingHistory(Long vehicleId, User requester) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + vehicleId));
+
+        if (requester.getRole() == User.Role.CUSTOMER
+                && !vehicle.getUser().getId().equals(requester.getId())) {
+            throw new SecurityException("Not authorized to view history for this vehicle");
+        }
+
+        return recordRepository.findByVehicleIdOrderByEntryTimeDesc(vehicleId)
+                .stream().map(this::toHistoryResponse).collect(Collectors.toList());
+    }
+
+    /**
+     * Get all parking history for a specific user (across all their vehicles).
+     */
+    public List<ParkingHistoryResponse> getParkingHistoryForUser(Long userId) {
+        return recordRepository.findByVehicleUserIdOrderByEntryTimeDesc(userId)
+                .stream().map(this::toHistoryResponse).collect(Collectors.toList());
+    }
+
+    /**
+     * Get active (in-progress) parking sessions for a user.
+     */
+    public List<ParkingHistoryResponse> getActiveSessionsForUser(Long userId) {
+        return recordRepository.findActiveByVehicleUserIdOrderByEntryTimeDesc(userId)
+                .stream().map(this::toHistoryResponse).collect(Collectors.toList());
+    }
+
     public List<ParkingHistoryResponse> getAllParkingHistory() {
         return recordRepository.findByStatusOrderByEntryTimeDesc(RecordStatus.COMPLETED)
                 .stream().map(this::toHistoryResponse).collect(Collectors.toList());
@@ -234,6 +328,11 @@ public class ParkingService {
         r.setStatus(s.getStatus());
         r.setFloor(s.getFloor());
         return r;
+    }
+
+    /** Public wrapper for AdminService to reuse the history mapper. */
+    public ParkingHistoryResponse toHistoryResponsePublic(ParkingRecord rec) {
+        return toHistoryResponse(rec);
     }
 
     private ParkingHistoryResponse toHistoryResponse(ParkingRecord rec) {
