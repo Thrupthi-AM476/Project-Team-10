@@ -45,8 +45,13 @@ public class VehicleService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Return active and inactive vehicles to staff so the oversight table can
+     * display the status of every registered vehicle. Customer queries remain
+     * restricted to the customer's active vehicles by getVehiclesForUser.
+     */
     public List<VehicleResponse> getAllVehicles() {
-        return vehicleRepository.findByIsActiveTrue()
+        return vehicleRepository.findAll()
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -130,10 +135,10 @@ public class VehicleService {
     }
 
     public VehicleResponse getByLicensePlate(String licensePlate) {
-        Vehicle v = vehicleRepository.findByLicensePlate(licensePlate.toUpperCase())
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(licensePlate.toUpperCase())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Vehicle not found: " + licensePlate));
-        return toResponse(v);
+        return toResponse(vehicle);
     }
 
     public Vehicle getEntityByLicensePlate(String licensePlate) {
@@ -142,18 +147,18 @@ public class VehicleService {
                         "Vehicle not found: " + licensePlate));
     }
 
-    private VehicleResponse toResponse(Vehicle v) {
-        VehicleResponse r = new VehicleResponse();
-        r.setId(v.getId());
-        r.setLicensePlate(v.getLicensePlate());
-        r.setMake(v.getMake());
-        r.setModel(v.getModel());
-        r.setColor(v.getColor());
-        r.setVehicleType(v.getVehicleType());
-        r.setUserId(v.getUser().getId());
-        r.setOwnerName(v.getUser().getFullName());
-        r.setActive(v.isActive());
-        r.setCreatedAt(v.getCreatedAt());
-        return r;
+    private VehicleResponse toResponse(Vehicle vehicle) {
+        VehicleResponse response = new VehicleResponse();
+        response.setId(vehicle.getId());
+        response.setLicensePlate(vehicle.getLicensePlate());
+        response.setMake(vehicle.getMake());
+        response.setModel(vehicle.getModel());
+        response.setColor(vehicle.getColor());
+        response.setVehicleType(vehicle.getVehicleType());
+        response.setUserId(vehicle.getUser().getId());
+        response.setOwnerName(vehicle.getUser().getFullName());
+        response.setActive(vehicle.isActive());
+        response.setCreatedAt(vehicle.getCreatedAt());
+        return response;
     }
 }

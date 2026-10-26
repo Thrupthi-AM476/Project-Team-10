@@ -5,8 +5,8 @@ export function Landing() {
   const { isAuthenticated, user } = useAuth()
   const dashboardPath =
     user?.role === 'ADMINISTRATOR' ? '/admin'
-    : user?.role === 'PARKING_ATTENDANT' || user?.role === 'MAINTENANCE_TECHNICIAN' ? '/staff'
-    : '/dashboard'
+      : user?.role === 'PARKING_ATTENDANT' ? '/staff'
+        : '/dashboard'
 
   const features = [
     { icon: '🚗', title: 'Vehicle Management', desc: 'Register and manage your vehicles with license plate tracking' },
@@ -31,6 +31,7 @@ export function Landing() {
           ) : (
             <>
               <Link to="/register" className="btn btn-primary">Get Started</Link>
+              <Link to="/parking" className="btn btn-secondary">View Parking Availability</Link>
               <Link to="/login" className="btn btn-outline" style={{ color: 'var(--gray-700)', borderColor: 'var(--gray-300)' }}>Login</Link>
             </>
           )}
@@ -38,11 +39,11 @@ export function Landing() {
       </section>
 
       <div className="features-grid">
-        {features.map(f => (
-          <div key={f.title} className="card feature-card">
-            <div className="icon">{f.icon}</div>
-            <h3>{f.title}</h3>
-            <p>{f.desc}</p>
+        {features.map(feature => (
+          <div key={feature.title} className="card feature-card">
+            <div className="icon">{feature.icon}</div>
+            <h3>{feature.title}</h3>
+            <p>{feature.desc}</p>
           </div>
         ))}
       </div>
