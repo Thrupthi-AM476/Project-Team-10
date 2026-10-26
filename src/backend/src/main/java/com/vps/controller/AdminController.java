@@ -1,4 +1,3 @@
-```java
 package com.vps.controller;
 
 import com.vps.dto.AdminDashboardResponse;
@@ -93,4 +92,3 @@ public class AdminController {
                         adminService.getReport(from, to)));
     }
 }
-```
