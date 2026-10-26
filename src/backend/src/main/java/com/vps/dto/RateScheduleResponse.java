@@ -1,3 +1,4 @@
+```java
 package com.vps.dto;
 
 import com.vps.entity.RateSchedule;
@@ -31,3 +32,4 @@ public class RateScheduleResponse {
         return response;
     }
 }
+```

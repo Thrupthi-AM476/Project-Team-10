@@ -1,3 +1,4 @@
+```java
 package com.vps.dto;
 
 import com.vps.entity.Vehicle.VehicleType;
@@ -30,3 +31,4 @@ public class RateScheduleRequest {
     // Null means default active on create and unchanged on update.
     private Boolean active;
 }
+```

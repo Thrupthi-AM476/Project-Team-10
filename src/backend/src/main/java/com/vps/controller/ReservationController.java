@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -59,8 +60,9 @@ public class ReservationController {
         return ResponseEntity.ok(ApiResponse.success("Reservation cancelled", response));
     }
 
-    // POST /api/v1/reservations/expire — trigger expiry check (admin/attendant)
+    // POST /api/v1/reservations/expire — trigger expiry check (admin/attendant only)
     @PostMapping("/expire")
+    @PreAuthorize("hasAnyRole('ADMINISTRATOR','PARKING_ATTENDANT')")
     public ResponseEntity<ApiResponse<Void>> expireReservations() {
         reservationService.expireOverdueReservations();
         return ResponseEntity.ok(ApiResponse.success("Expired reservations updated", null));
