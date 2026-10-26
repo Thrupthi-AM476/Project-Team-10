@@ -1,3 +1,4 @@
+```java
 package com.vps.service;
 
 import com.vps.dto.*;
@@ -33,30 +34,41 @@ public class ParkingService {
     private final VehicleRepository vehicleRepository;
     private final VehicleService vehicleService;
     private final AuditLogService auditLogService;
+    private final ReservationRepository reservationRepository;
 
     private static final AtomicLong ticketCounter = new AtomicLong(1);
 
     // ---------------------------------------------------------------
     // VPS-F-004: Slot availability
     // ---------------------------------------------------------------
+
     public List<ParkingSlotResponse> getAllSlots() {
         return slotRepository.findAll().stream()
-                .map(this::toSlotResponse).collect(Collectors.toList());
+                .map(this::toSlotResponse)
+                .collect(Collectors.toList());
     }
 
     public List<ParkingSlotResponse> getAvailableSlots() {
+        LocalDateTime now = LocalDateTime.now();
+
         return slotRepository.findByStatus(SlotStatus.AVAILABLE).stream()
-                .map(this::toSlotResponse).collect(Collectors.toList());
+                .filter(slot -> !reservationRepository
+                        .isSlotReservedAtTime(slot.getId(), now))
+                .map(this::toSlotResponse)
+                .collect(Collectors.toList());
     }
 
     // ---------------------------------------------------------------
     // VPS-F-005: Slot management (staff/admin)
     // ---------------------------------------------------------------
+
     @Transactional
     public ParkingSlotResponse createSlot(ParkingSlotRequest request) {
         if (slotRepository.findAll().stream()
-                .anyMatch(s -> s.getSlotNumber().equalsIgnoreCase(request.getSlotNumber()))) {
-            throw new IllegalArgumentException("Slot number already exists: " + request.getSlotNumber());
+                .anyMatch(s -> s.getSlotNumber()
+                        .equalsIgnoreCase(request.getSlotNumber()))) {
+            throw new IllegalArgumentException(
+                    "Slot number already exists: " + request.getSlotNumber());
         }
 
         ParkingSlot slot = new ParkingSlot();
@@ -68,26 +80,35 @@ public class ParkingService {
         try {
             slotRepository.save(slot);
         } catch (DataIntegrityViolationException ex) {
-            throw new IllegalArgumentException("Slot number already exists: " + request.getSlotNumber());
+            throw new IllegalArgumentException(
+                    "Slot number already exists: " + request.getSlotNumber());
         }
 
         return toSlotResponse(slot);
     }
 
     @Transactional
-    public ParkingSlotResponse updateSlot(Long slotId, ParkingSlotRequest request) {
+    public ParkingSlotResponse updateSlot(
+            Long slotId, ParkingSlotRequest request) {
+
         ParkingSlot slot = slotRepository.findById(slotId)
-                .orElseThrow(() -> new IllegalArgumentException("Slot not found: " + slotId));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Slot not found: " + slotId));
 
         if (request.getSlotType() != null) {
             slot.setSlotType(request.getSlotType());
         }
+
         if (request.getFloor() != null) {
             slot.setFloor(request.getFloor());
         }
-        if (request.getStatus() != null && !request.getStatus().isBlank()) {
-            slot.setStatus(SlotStatus.valueOf(request.getStatus().toUpperCase()));
+
+        if (request.getStatus() != null
+                && !request.getStatus().isBlank()) {
+            slot.setStatus(
+                    SlotStatus.valueOf(request.getStatus().toUpperCase()));
         }
+
         slotRepository.save(slot);
 
         return toSlotResponse(slot);
@@ -96,64 +117,81 @@ public class ParkingService {
     @Transactional
     public void deactivateSlot(Long slotId) {
         ParkingSlot slot = slotRepository.findById(slotId)
-                .orElseThrow(() -> new IllegalArgumentException("Slot not found: " + slotId));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Slot not found: " + slotId));
+
         slot.setStatus(SlotStatus.OUT_OF_SERVICE);
         slotRepository.save(slot);
     }
 
     // ---------------------------------------------------------------
-    // VPS-F-001 to VPS-F-003: Vehicle Entry
+    // VPS-F-001 to VPS-F-003: Vehicle entry
     // ---------------------------------------------------------------
+
     @Transactional
-    public ParkingEntryResponse processEntry(ParkingEntryRequest request, User actor) {
+    public ParkingEntryResponse processEntry(
+            ParkingEntryRequest request, User actor) {
+
         String plate = request.getLicensePlate().toUpperCase();
 
-        // Look up vehicle
         Vehicle vehicle = vehicleService.getEntityByLicensePlate(plate);
 
-        // VPS-SR-003: Ownership check — customers can only park their own vehicle
+        // Customers may park only vehicles they own.
         if (actor.getRole() == User.Role.CUSTOMER
                 && !vehicle.getUser().getId().equals(actor.getId())) {
-            throw new SecurityException("You can only park your own vehicle");
+            throw new SecurityException(
+                    "You can only park your own vehicle");
         }
 
-        // Check vehicle not already parked — VPS-F-002 prevent duplicate active sessions
-        if (recordRepository
-                .findByVehicleIdAndStatus(vehicle.getId(), RecordStatus.ACTIVE)
-                .isPresent()) {
+        // Prevent duplicate active parking sessions.
+        if (recordRepository.findByVehicleIdAndStatus(
+                vehicle.getId(), RecordStatus.ACTIVE).isPresent()) {
             throw new IllegalStateException(
                     "Vehicle " + plate + " is already parked");
         }
 
-        // VPS-F-006: find available slot
+        // Select an available slot while respecting reservations.
         SlotType preferredType = parseSlotType(request.getSlotType());
-        ParkingSlot slot;
-        if (preferredType != null) {
-            slot = slotRepository.findFirstByStatusAndSlotType(SlotStatus.AVAILABLE, preferredType)
-                    .orElseGet(() -> slotRepository.findFirstByStatus(SlotStatus.AVAILABLE)
-                            .orElseThrow(() -> new IllegalStateException(
-                                    "Parking is full. No available slots.")));
-        } else {
-            slot = slotRepository.findFirstByStatus(SlotStatus.AVAILABLE)
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Parking is full. No available slots."));
-        }
+        LocalDateTime entryTime = LocalDateTime.now();
 
-        // Mark slot occupied
+        List<ParkingSlot> preferredCandidates = preferredType != null
+                ? slotRepository.findByStatusAndSlotType(
+                        SlotStatus.AVAILABLE, preferredType)
+                : List.of();
+
+        List<ParkingSlot> allAvailable =
+                slotRepository.findByStatus(SlotStatus.AVAILABLE);
+
+        ParkingSlot slot = java.util.stream.Stream.concat(
+                        preferredCandidates.stream(),
+                        allAvailable.stream().filter(s ->
+                                preferredType == null
+                                        || s.getSlotType() != preferredType))
+                .filter(s -> !reservationRepository
+                        .isSlotReservedAtTime(s.getId(), entryTime))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Parking is full or all available slots are reserved for this time."));
+
+        // Mark the selected slot occupied.
         slot.setStatus(SlotStatus.OCCUPIED);
         slotRepository.save(slot);
 
-        // Create parking record — VPS-F-003
+        // Create the parking record.
         ParkingRecord record = new ParkingRecord();
         record.setTicketId(generateTicketId());
         record.setVehicle(vehicle);
         record.setSlot(slot);
-        record.setEntryTime(LocalDateTime.now());
+        record.setEntryTime(entryTime);
         record.setStatus(RecordStatus.ACTIVE);
         record.setEntryTerminal(request.getCaptureMethod());
         recordRepository.save(record);
 
-        auditLogService.log(actor, "VEHICLE_ENTRY", "PARKING_RECORD", record.getId(),
+        auditLogService.log(
+                actor,
+                "VEHICLE_ENTRY",
+                "PARKING_RECORD",
+                record.getId(),
                 "Entry: " + plate + " -> Slot " + slot.getSlotNumber()
                         + " Ticket: " + record.getTicketId());
 
@@ -164,65 +202,82 @@ public class ParkingService {
         resp.setSlotType(slot.getSlotType().name());
         resp.setEntryTime(record.getEntryTime());
         resp.setStatus("ENTRY_SUCCESS");
-        resp.setMessage("Vehicle entry recorded. Slot " + slot.getSlotNumber() + " assigned.");
+        resp.setMessage(
+                "Vehicle entry recorded. Slot "
+                        + slot.getSlotNumber() + " assigned.");
+
         return resp;
     }
 
     // ---------------------------------------------------------------
-    // VPS-F-007 to VPS-F-010: Vehicle Exit + Fee + Payment
+    // VPS-F-007 to VPS-F-010: Vehicle exit, fee and payment
     // ---------------------------------------------------------------
+
     @Transactional
-    public ParkingExitResponse processExit(ParkingExitRequest request, User actor) {
-        // Find active record by ticket
-        ParkingRecord record = recordRepository.findByTicketId(request.getTicketId())
+    public ParkingExitResponse processExit(
+            ParkingExitRequest request, User actor) {
+
+        ParkingRecord record = recordRepository
+                .findByTicketId(request.getTicketId())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Ticket not found: " + request.getTicketId()));
 
         if (record.getStatus() != RecordStatus.ACTIVE) {
             throw new IllegalStateException(
-                    "Ticket " + request.getTicketId() + " is already completed or cancelled");
+                    "Ticket " + request.getTicketId()
+                            + " is already completed or cancelled");
         }
 
-        // VPS-SR-003: Ownership check — customers can only exit their own parking session
+        // Customers may exit only their own parking sessions.
         if (actor.getRole() == User.Role.CUSTOMER
-                && !record.getVehicle().getUser().getId().equals(actor.getId())) {
-            throw new SecurityException("You can only process exit for your own vehicle");
+                && !record.getVehicle().getUser().getId()
+                        .equals(actor.getId())) {
+            throw new SecurityException(
+                    "You can only process exit for your own vehicle");
         }
 
         LocalDateTime exitTime = LocalDateTime.now();
-        long minutes = ChronoUnit.MINUTES.between(record.getEntryTime(), exitTime);
+        long minutes = ChronoUnit.MINUTES.between(
+                record.getEntryTime(), exitTime);
 
-        // VPS-F-007: calculate fee from rate schedule
-        BigDecimal fee = calculateFee(record.getVehicle().getVehicleType(), minutes);
+        BigDecimal fee = calculateFee(
+                record.getVehicle().getVehicleType(), minutes);
 
-        // Process payment (mock — academic project)
-        PaymentMethod method = PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase());
+        // Mock payment processing for the academic project.
+        PaymentMethod method = PaymentMethod.valueOf(
+                request.getPaymentMethod().toUpperCase());
+
         Payment payment = new Payment();
         payment.setParkingRecord(record);
         payment.setAmount(fee);
         payment.setPaymentMethod(method);
-        payment.setPaymentStatus(PaymentStatus.SUCCESS); // mock always succeeds
+        payment.setPaymentStatus(PaymentStatus.SUCCESS);
         payment.setTransactionRef("TXN-" + System.currentTimeMillis());
         payment.setPaidAt(exitTime);
         paymentRepository.save(payment);
 
-        // Update record
+        // Update the parking record.
         record.setExitTime(exitTime);
         record.setDurationMinutes((int) minutes);
         record.setFeeAmount(fee);
         record.setStatus(RecordStatus.COMPLETED);
         recordRepository.save(record);
 
-        // VPS-F-010: release slot
+        // Release the parking slot.
         ParkingSlot slot = record.getSlot();
         slot.setStatus(SlotStatus.AVAILABLE);
         slotRepository.save(slot);
 
-        auditLogService.log(actor, "VEHICLE_EXIT", "PARKING_RECORD", record.getId(),
+        auditLogService.log(
+                actor,
+                "VEHICLE_EXIT",
+                "PARKING_RECORD",
+                record.getId(),
                 "Exit: " + record.getVehicle().getLicensePlate()
                         + " Duration: " + minutes + "min Fee: " + fee);
 
         String receiptId = "RCP-" + record.getTicketId();
+
         ParkingExitResponse resp = new ParkingExitResponse();
         resp.setTicketId(record.getTicketId());
         resp.setLicensePlate(record.getVehicle().getLicensePlate());
@@ -235,84 +290,123 @@ public class ParkingService {
         resp.setPaymentMethod(method.name());
         resp.setPaymentStatus("SUCCESS");
         resp.setReceiptId(receiptId);
-        resp.setMessage("Exit processed successfully. Receipt: " + receiptId);
+        resp.setMessage(
+                "Exit processed successfully. Receipt: " + receiptId);
+
         return resp;
     }
 
+    // ---------------------------------------------------------------
+    // Parking history
+    // ---------------------------------------------------------------
+
     public List<ParkingHistoryResponse> getParkingHistory(Long vehicleId) {
-        return recordRepository.findByVehicleIdOrderByEntryTimeDesc(vehicleId)
-                .stream().map(this::toHistoryResponse).collect(Collectors.toList());
+        return recordRepository
+                .findByVehicleIdOrderByEntryTimeDesc(vehicleId)
+                .stream()
+                .map(this::toHistoryResponse)
+                .collect(Collectors.toList());
     }
 
     /**
      * Ownership-aware vehicle history lookup.
-     * CUSTOMER may only see history for their own vehicle; staff may see any.
+     * Customers may only see history for their own vehicle.
      */
-    public List<ParkingHistoryResponse> getParkingHistory(Long vehicleId, User requester) {
+    public List<ParkingHistoryResponse> getParkingHistory(
+            Long vehicleId, User requester) {
+
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + vehicleId));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Vehicle not found: " + vehicleId));
 
         if (requester.getRole() == User.Role.CUSTOMER
                 && !vehicle.getUser().getId().equals(requester.getId())) {
-            throw new SecurityException("Not authorized to view history for this vehicle");
+            throw new SecurityException(
+                    "Not authorized to view history for this vehicle");
         }
 
-        return recordRepository.findByVehicleIdOrderByEntryTimeDesc(vehicleId)
-                .stream().map(this::toHistoryResponse).collect(Collectors.toList());
+        return recordRepository
+                .findByVehicleIdOrderByEntryTimeDesc(vehicleId)
+                .stream()
+                .map(this::toHistoryResponse)
+                .collect(Collectors.toList());
     }
 
     /**
-     * Get all parking history for a specific user (across all their vehicles).
+     * Get all parking history for a specific user across their vehicles.
      */
     public List<ParkingHistoryResponse> getParkingHistoryForUser(Long userId) {
-        return recordRepository.findByVehicleUserIdOrderByEntryTimeDesc(userId)
-                .stream().map(this::toHistoryResponse).collect(Collectors.toList());
+        return recordRepository
+                .findByVehicleUserIdOrderByEntryTimeDesc(userId)
+                .stream()
+                .map(this::toHistoryResponse)
+                .collect(Collectors.toList());
     }
 
     /**
-     * Get active (in-progress) parking sessions for a user.
+     * Get active parking sessions for a user.
      */
     public List<ParkingHistoryResponse> getActiveSessionsForUser(Long userId) {
-        return recordRepository.findActiveByVehicleUserIdOrderByEntryTimeDesc(userId)
-                .stream().map(this::toHistoryResponse).collect(Collectors.toList());
+        return recordRepository
+                .findActiveByVehicleUserIdOrderByEntryTimeDesc(userId)
+                .stream()
+                .map(this::toHistoryResponse)
+                .collect(Collectors.toList());
     }
 
     public List<ParkingHistoryResponse> getAllParkingHistory() {
-        return recordRepository.findByStatusOrderByEntryTimeDesc(RecordStatus.COMPLETED)
-                .stream().map(this::toHistoryResponse).collect(Collectors.toList());
+        return recordRepository
+                .findByStatusOrderByEntryTimeDesc(RecordStatus.COMPLETED)
+                .stream()
+                .map(this::toHistoryResponse)
+                .collect(Collectors.toList());
     }
 
     // ---------------------------------------------------------------
     // Fee calculation — VPS-F-007
     // ---------------------------------------------------------------
-    private BigDecimal calculateFee(Vehicle.VehicleType vehicleType, long durationMinutes) {
+
+    private BigDecimal calculateFee(
+            Vehicle.VehicleType vehicleType, long durationMinutes) {
+
         RateSchedule rate = rateScheduleRepository
                 .findFirstByVehicleTypeAndIsActiveTrue(vehicleType)
                 .orElseThrow(() -> new IllegalStateException(
-                        "No rate schedule found for vehicle type: " + vehicleType));
+                        "No rate schedule found for vehicle type: "
+                                + vehicleType));
 
-        // Apply grace period
-        long billableMinutes = Math.max(0, durationMinutes - rate.getGracePeriodMinutes());
-        if (billableMinutes == 0) return BigDecimal.ZERO;
+        long billableMinutes = Math.max(
+                0, durationMinutes - rate.getGracePeriodMinutes());
 
-        // Rate per hour → per minute
+        if (billableMinutes == 0) {
+            return BigDecimal.ZERO;
+        }
+
         BigDecimal ratePerMinute = rate.getRatePerHour()
                 .divide(BigDecimal.valueOf(60), 4, RoundingMode.HALF_UP);
 
-        return ratePerMinute.multiply(BigDecimal.valueOf(billableMinutes))
+        return ratePerMinute
+                .multiply(BigDecimal.valueOf(billableMinutes))
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
+
     private String generateTicketId() {
-        String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        return "TKT-" + date + "-" + String.format("%05d", ticketCounter.getAndIncrement());
+        String date = LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+        return "TKT-" + date + "-"
+                + String.format("%05d", ticketCounter.getAndIncrement());
     }
 
     private SlotType parseSlotType(String slotType) {
-        if (slotType == null || slotType.isBlank()) return null;
+        if (slotType == null || slotType.isBlank()) {
+            return null;
+        }
+
         try {
             return SlotType.valueOf(slotType.toUpperCase());
         } catch (IllegalArgumentException e) {
@@ -320,36 +414,39 @@ public class ParkingService {
         }
     }
 
-    private ParkingSlotResponse toSlotResponse(ParkingSlot s) {
-        ParkingSlotResponse r = new ParkingSlotResponse();
-        r.setId(s.getId());
-        r.setSlotNumber(s.getSlotNumber());
-        r.setSlotType(s.getSlotType());
-        r.setStatus(s.getStatus());
-        r.setFloor(s.getFloor());
-        return r;
+    private ParkingSlotResponse toSlotResponse(ParkingSlot slot) {
+        ParkingSlotResponse response = new ParkingSlotResponse();
+        response.setId(slot.getId());
+        response.setSlotNumber(slot.getSlotNumber());
+        response.setSlotType(slot.getSlotType());
+        response.setStatus(slot.getStatus());
+        response.setFloor(slot.getFloor());
+        return response;
     }
 
     /** Public wrapper for AdminService to reuse the history mapper. */
-    public ParkingHistoryResponse toHistoryResponsePublic(ParkingRecord rec) {
-        return toHistoryResponse(rec);
+    public ParkingHistoryResponse toHistoryResponsePublic(ParkingRecord record) {
+        return toHistoryResponse(record);
     }
 
-    private ParkingHistoryResponse toHistoryResponse(ParkingRecord rec) {
-        ParkingHistoryResponse r = new ParkingHistoryResponse();
-        r.setId(rec.getId());
-        r.setTicketId(rec.getTicketId());
-        r.setLicensePlate(rec.getVehicle().getLicensePlate());
-        r.setSlotNumber(rec.getSlot().getSlotNumber());
-        r.setEntryTime(rec.getEntryTime());
-        r.setExitTime(rec.getExitTime());
-        r.setDurationMinutes(rec.getDurationMinutes());
-        r.setFeeAmount(rec.getFeeAmount());
-        r.setStatus(rec.getStatus().name());
-        paymentRepository.findByParkingRecordId(rec.getId()).ifPresent(p -> {
-            r.setPaymentMethod(p.getPaymentMethod().name());
-            r.setPaymentStatus(p.getPaymentStatus().name());
+    private ParkingHistoryResponse toHistoryResponse(ParkingRecord record) {
+        ParkingHistoryResponse response = new ParkingHistoryResponse();
+        response.setId(record.getId());
+        response.setTicketId(record.getTicketId());
+        response.setLicensePlate(record.getVehicle().getLicensePlate());
+        response.setSlotNumber(record.getSlot().getSlotNumber());
+        response.setEntryTime(record.getEntryTime());
+        response.setExitTime(record.getExitTime());
+        response.setDurationMinutes(record.getDurationMinutes());
+        response.setFeeAmount(record.getFeeAmount());
+        response.setStatus(record.getStatus().name());
+
+        paymentRepository.findByParkingRecordId(record.getId()).ifPresent(payment -> {
+            response.setPaymentMethod(payment.getPaymentMethod().name());
+            response.setPaymentStatus(payment.getPaymentStatus().name());
         });
-        return r;
+
+        return response;
     }
 }
+```
