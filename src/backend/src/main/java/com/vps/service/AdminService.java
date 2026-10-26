@@ -1,11 +1,12 @@
+
 package com.vps.service;
 
 import com.vps.dto.AdminDashboardResponse;
 import com.vps.dto.ParkingHistoryResponse;
 import com.vps.dto.RateScheduleRequest;
 import com.vps.dto.RateScheduleResponse;
-import com.vps.entity.ParkingSlot.SlotStatus;
 import com.vps.entity.ParkingRecord.RecordStatus;
+import com.vps.entity.ParkingSlot.SlotStatus;
 import com.vps.entity.RateSchedule;
 import com.vps.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -33,50 +34,67 @@ public class AdminService {
         AdminDashboardResponse dash = new AdminDashboardResponse();
 
         dash.setTotalSlots(slotRepository.count());
-        dash.setAvailableSlots(slotRepository.countByStatus(SlotStatus.AVAILABLE));
-        dash.setOccupiedSlots(slotRepository.countByStatus(SlotStatus.OCCUPIED));
-        dash.setReservedSlots(slotRepository.countByStatus(SlotStatus.RESERVED));
-        dash.setOutOfServiceSlots(slotRepository.countByStatus(SlotStatus.OUT_OF_SERVICE));
+        dash.setAvailableSlots(
+                slotRepository.countByStatus(SlotStatus.AVAILABLE));
+        dash.setOccupiedSlots(
+                slotRepository.countByStatus(SlotStatus.OCCUPIED));
+        dash.setReservedSlots(
+                slotRepository.countByStatus(SlotStatus.RESERVED));
+        dash.setOutOfServiceSlots(
+                slotRepository.countByStatus(SlotStatus.OUT_OF_SERVICE));
         dash.setActiveVehicles(recordRepository.countActiveRecords());
         dash.setTotalUsersRegistered(userRepository.count());
         dash.setTotalCompletedTransactions(
-                recordRepository.findByStatusOrderByEntryTimeDesc(RecordStatus.COMPLETED).size());
+                recordRepository.findByStatusOrderByEntryTimeDesc(
+                        RecordStatus.COMPLETED).size());
 
-        // Revenue today
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         LocalDateTime now = LocalDateTime.now();
-        BigDecimal todayRevenue = recordRepository.sumRevenueByDateRange(startOfDay, now);
-        dash.setRevenueToday(todayRevenue != null ? todayRevenue : BigDecimal.ZERO);
 
-        // Revenue this month
-        LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
-        BigDecimal monthRevenue = recordRepository.sumRevenueByDateRange(startOfMonth, now);
-        dash.setRevenueThisMonth(monthRevenue != null ? monthRevenue : BigDecimal.ZERO);
+        BigDecimal todayRevenue =
+                recordRepository.sumRevenueByDateRange(startOfDay, now);
+        dash.setRevenueToday(
+                todayRevenue != null ? todayRevenue : BigDecimal.ZERO);
+
+        LocalDateTime startOfMonth =
+                LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        BigDecimal monthRevenue =
+                recordRepository.sumRevenueByDateRange(startOfMonth, now);
+        dash.setRevenueThisMonth(
+                monthRevenue != null ? monthRevenue : BigDecimal.ZERO);
 
         return dash;
     }
 
-    // VPS-F-015: Report — history with optional date range (efficient query)
-    public List<ParkingHistoryResponse> getReport(LocalDateTime from, LocalDateTime to) {
-        if (from == null) from = LocalDateTime.now().minusDays(30);
-        if (to == null) to = LocalDateTime.now();
-        return recordRepository.findByEntryTimeBetweenOrderByEntryTimeDesc(from, to)
+    // VPS-F-015: Report — history with optional date range
+    public List<ParkingHistoryResponse> getReport(
+            LocalDateTime from, LocalDateTime to) {
+
+        if (from == null) {
+            from = LocalDateTime.now().minusDays(30);
+        }
+        if (to == null) {
+            to = LocalDateTime.now();
+        }
+
+        return recordRepository
+                .findByEntryTimeBetweenOrderByEntryTimeDesc(from, to)
                 .stream()
                 .map(parkingService::toHistoryResponsePublic)
                 .collect(Collectors.toList());
     }
 
-    // ---------------------------------------------------------------
     // VPS-F-014: Rate schedule configuration
-    // ---------------------------------------------------------------
     public List<RateScheduleResponse> getAllRates() {
         return rateScheduleRepository.findAll().stream()
-                .map(this::toRateResponse).collect(Collectors.toList());
+                .map(this::toRateResponse)
+                .collect(Collectors.toList());
     }
 
     public List<RateScheduleResponse> getActiveRates() {
         return rateScheduleRepository.findByIsActiveTrue().stream()
-                .map(this::toRateResponse).collect(Collectors.toList());
+                .map(this::toRateResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -86,34 +104,46 @@ public class AdminService {
         rate.setVehicleType(request.getVehicleType());
         rate.setRatePerHour(request.getRatePerHour());
         rate.setGracePeriodMinutes(request.getGracePeriodMinutes());
-        rate.setActive(request.isActive());
+
+        // Default to active when the request does not specify a value.
+        rate.setActive(
+                request.getActive() == null || request.getActive());
+
         rateScheduleRepository.save(rate);
         return toRateResponse(rate);
     }
 
     @Transactional
-    public RateScheduleResponse updateRate(Long rateId, RateScheduleRequest request) {
+    public RateScheduleResponse updateRate(
+            Long rateId, RateScheduleRequest request) {
+
         RateSchedule rate = rateScheduleRepository.findById(rateId)
-                .orElseThrow(() -> new IllegalArgumentException("Rate schedule not found: " + rateId));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Rate schedule not found: " + rateId));
 
         rate.setName(request.getName());
         rate.setVehicleType(request.getVehicleType());
         rate.setRatePerHour(request.getRatePerHour());
         rate.setGracePeriodMinutes(request.getGracePeriodMinutes());
-        rate.setActive(request.isActive());
+
+        // If omitted, preserve the current active state.
+        if (request.getActive() != null) {
+            rate.setActive(request.getActive());
+        }
+
         rateScheduleRepository.save(rate);
         return toRateResponse(rate);
     }
 
-    private RateScheduleResponse toRateResponse(RateSchedule r) {
-        RateScheduleResponse resp = new RateScheduleResponse();
-        resp.setId(r.getId());
-        resp.setName(r.getName());
-        resp.setVehicleType(r.getVehicleType());
-        resp.setRatePerHour(r.getRatePerHour());
-        resp.setGracePeriodMinutes(r.getGracePeriodMinutes());
-        resp.setActive(r.isActive());
-        resp.setCreatedAt(r.getCreatedAt());
-        return resp;
+    private RateScheduleResponse toRateResponse(RateSchedule rate) {
+        RateScheduleResponse response = new RateScheduleResponse();
+        response.setId(rate.getId());
+        response.setName(rate.getName());
+        response.setVehicleType(rate.getVehicleType());
+        response.setRatePerHour(rate.getRatePerHour());
+        response.setGracePeriodMinutes(rate.getGracePeriodMinutes());
+        response.setActive(rate.isActive());
+        response.setCreatedAt(rate.getCreatedAt());
+        return response;
     }
 }

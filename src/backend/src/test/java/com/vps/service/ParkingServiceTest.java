@@ -29,13 +29,29 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ParkingServiceTest {
 
-    @Mock private ParkingSlotRepository slotRepository;
-    @Mock private ParkingRecordRepository recordRepository;
-    @Mock private PaymentRepository paymentRepository;
-    @Mock private RateScheduleRepository rateScheduleRepository;
-    @Mock private VehicleRepository vehicleRepository;
-    @Mock private VehicleService vehicleService;
-    @Mock private AuditLogService auditLogService;
+    @Mock
+    private ParkingSlotRepository slotRepository;
+
+    @Mock
+    private ParkingRecordRepository recordRepository;
+
+    @Mock
+    private PaymentRepository paymentRepository;
+
+    @Mock
+    private RateScheduleRepository rateScheduleRepository;
+
+    @Mock
+    private VehicleRepository vehicleRepository;
+
+    @Mock
+    private VehicleService vehicleService;
+
+    @Mock
+    private AuditLogService auditLogService;
+
+    @Mock
+    private ReservationRepository reservationRepository;
 
     @InjectMocks
     private ParkingService parkingService;
@@ -78,18 +94,34 @@ class ParkingServiceTest {
     @Test
     void processEntry_ownVehicle_succeeds() {
         ParkingEntryRequest req = new ParkingEntryRequest();
-        req.setLicensePlate("ka01ab1234"); // lowercase — should be normalized
+        req.setLicensePlate("ka01ab1234");
 
-        when(vehicleService.getEntityByLicensePlate("KA01AB1234")).thenReturn(vehicle);
-        when(recordRepository.findByVehicleIdAndStatus(10L, RecordStatus.ACTIVE)).thenReturn(Optional.empty());
-        when(slotRepository.findFirstByStatus(SlotStatus.AVAILABLE)).thenReturn(Optional.of(slot));
+        when(vehicleService.getEntityByLicensePlate("KA01AB1234"))
+                .thenReturn(vehicle);
 
-        ParkingEntryResponse resp = parkingService.processEntry(req, customer);
+        when(recordRepository.findByVehicleIdAndStatus(
+                10L, RecordStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        // No preferred slot type was requested, so all available
+        // slots must be searched.
+        when(slotRepository.findByStatus(SlotStatus.AVAILABLE))
+                .thenReturn(List.of(slot));
+
+        // The selected slot is not reserved at the entry time.
+        when(reservationRepository.isSlotReservedAtTime(
+                eq(5L), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        ParkingEntryResponse resp =
+                parkingService.processEntry(req, customer);
 
         assertThat(resp.getStatus()).isEqualTo("ENTRY_SUCCESS");
         assertThat(resp.getLicensePlate()).isEqualTo("KA01AB1234");
         assertThat(resp.getTicketId()).isNotEmpty();
-        verify(slotRepository).save(argThat(s -> s.getStatus() == SlotStatus.OCCUPIED));
+
+        verify(slotRepository).save(
+                argThat(s -> s.getStatus() == SlotStatus.OCCUPIED));
     }
 
     // (2) Customer cannot park another user's vehicle
@@ -98,9 +130,11 @@ class ParkingServiceTest {
         ParkingEntryRequest req = new ParkingEntryRequest();
         req.setLicensePlate("KA01AB1234");
 
-        when(vehicleService.getEntityByLicensePlate("KA01AB1234")).thenReturn(vehicle);
+        when(vehicleService.getEntityByLicensePlate("KA01AB1234"))
+                .thenReturn(vehicle);
 
-        assertThatThrownBy(() -> parkingService.processEntry(req, otherCustomer))
+        assertThatThrownBy(
+                () -> parkingService.processEntry(req, otherCustomer))
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("own vehicle");
     }
@@ -114,10 +148,15 @@ class ParkingServiceTest {
         ParkingRecord existing = new ParkingRecord();
         existing.setStatus(RecordStatus.ACTIVE);
 
-        when(vehicleService.getEntityByLicensePlate("KA01AB1234")).thenReturn(vehicle);
-        when(recordRepository.findByVehicleIdAndStatus(10L, RecordStatus.ACTIVE)).thenReturn(Optional.of(existing));
+        when(vehicleService.getEntityByLicensePlate("KA01AB1234"))
+                .thenReturn(vehicle);
 
-        assertThatThrownBy(() -> parkingService.processEntry(req, customer))
+        when(recordRepository.findByVehicleIdAndStatus(
+                10L, RecordStatus.ACTIVE))
+                .thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(
+                () -> parkingService.processEntry(req, customer))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("already parked");
     }
@@ -128,11 +167,18 @@ class ParkingServiceTest {
         ParkingEntryRequest req = new ParkingEntryRequest();
         req.setLicensePlate("KA01AB1234");
 
-        when(vehicleService.getEntityByLicensePlate("KA01AB1234")).thenReturn(vehicle);
-        when(recordRepository.findByVehicleIdAndStatus(10L, RecordStatus.ACTIVE)).thenReturn(Optional.empty());
-        when(slotRepository.findFirstByStatus(SlotStatus.AVAILABLE)).thenReturn(Optional.empty());
+        when(vehicleService.getEntityByLicensePlate("KA01AB1234"))
+                .thenReturn(vehicle);
 
-        assertThatThrownBy(() -> parkingService.processEntry(req, customer))
+        when(recordRepository.findByVehicleIdAndStatus(
+                10L, RecordStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        when(slotRepository.findByStatus(SlotStatus.AVAILABLE))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(
+                () -> parkingService.processEntry(req, customer))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("full");
     }
@@ -152,14 +198,21 @@ class ParkingServiceTest {
         record.setEntryTime(LocalDateTime.now().minusMinutes(60));
         record.setStatus(RecordStatus.ACTIVE);
 
-        when(recordRepository.findByTicketId("TKT-20261022-00001")).thenReturn(Optional.of(record));
-        when(rateScheduleRepository.findFirstByVehicleTypeAndIsActiveTrue(VehicleType.CAR)).thenReturn(Optional.of(rate));
+        when(recordRepository.findByTicketId("TKT-20261022-00001"))
+                .thenReturn(Optional.of(record));
 
-        ParkingExitResponse resp = parkingService.processExit(req, customer);
+        when(rateScheduleRepository
+                .findFirstByVehicleTypeAndIsActiveTrue(VehicleType.CAR))
+                .thenReturn(Optional.of(rate));
+
+        ParkingExitResponse resp =
+                parkingService.processExit(req, customer);
 
         assertThat(resp.getReceiptId()).isNotEmpty();
         assertThat(resp.getPaymentStatus()).isEqualTo("SUCCESS");
-        verify(slotRepository).save(argThat(s -> s.getStatus() == SlotStatus.AVAILABLE));
+
+        verify(slotRepository).save(
+                argThat(s -> s.getStatus() == SlotStatus.AVAILABLE));
     }
 
     // (6) Customer cannot exit another user's session
@@ -177,9 +230,11 @@ class ParkingServiceTest {
         record.setEntryTime(LocalDateTime.now().minusMinutes(30));
         record.setStatus(RecordStatus.ACTIVE);
 
-        when(recordRepository.findByTicketId("TKT-20261022-00001")).thenReturn(Optional.of(record));
+        when(recordRepository.findByTicketId("TKT-20261022-00001"))
+                .thenReturn(Optional.of(record));
 
-        assertThatThrownBy(() -> parkingService.processExit(req, otherCustomer))
+        assertThatThrownBy(
+                () -> parkingService.processExit(req, otherCustomer))
                 .isInstanceOf(SecurityException.class);
     }
 
@@ -195,9 +250,11 @@ class ParkingServiceTest {
         record.setVehicle(vehicle);
         record.setStatus(RecordStatus.COMPLETED);
 
-        when(recordRepository.findByTicketId("TKT-20261022-00001")).thenReturn(Optional.of(record));
+        when(recordRepository.findByTicketId("TKT-20261022-00001"))
+                .thenReturn(Optional.of(record));
 
-        assertThatThrownBy(() -> parkingService.processExit(req, customer))
+        assertThatThrownBy(
+                () -> parkingService.processExit(req, customer))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -213,15 +270,21 @@ class ParkingServiceTest {
         record.setTicketId("TKT-20261022-00002");
         record.setVehicle(vehicle);
         record.setSlot(slot);
-        record.setEntryTime(LocalDateTime.now().minusMinutes(10)); // within 15 min grace
+        record.setEntryTime(LocalDateTime.now().minusMinutes(10));
         record.setStatus(RecordStatus.ACTIVE);
 
-        when(recordRepository.findByTicketId("TKT-20261022-00002")).thenReturn(Optional.of(record));
-        when(rateScheduleRepository.findFirstByVehicleTypeAndIsActiveTrue(VehicleType.CAR)).thenReturn(Optional.of(rate));
+        when(recordRepository.findByTicketId("TKT-20261022-00002"))
+                .thenReturn(Optional.of(record));
 
-        ParkingExitResponse resp = parkingService.processExit(req, customer);
+        when(rateScheduleRepository
+                .findFirstByVehicleTypeAndIsActiveTrue(VehicleType.CAR))
+                .thenReturn(Optional.of(rate));
 
-        assertThat(resp.getFeeAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        ParkingExitResponse resp =
+                parkingService.processExit(req, customer);
+
+        assertThat(resp.getFeeAmount())
+                .isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     // (9) Staff can create a slot
@@ -234,11 +297,12 @@ class ParkingServiceTest {
         slotReq.setSlotType(ParkingSlot.SlotType.REGULAR);
         slotReq.setFloor("2");
 
-        when(slotRepository.save(any(ParkingSlot.class))).thenAnswer(inv -> {
-            ParkingSlot s = inv.getArgument(0);
-            s.setId(99L);
-            return s;
-        });
+        when(slotRepository.save(any(ParkingSlot.class)))
+                .thenAnswer(invocation -> {
+                    ParkingSlot savedSlot = invocation.getArgument(0);
+                    savedSlot.setId(99L);
+                    return savedSlot;
+                });
 
         var resp = parkingService.createSlot(slotReq);
 
@@ -252,10 +316,11 @@ class ParkingServiceTest {
         ParkingSlot existing = new ParkingSlot();
         existing.setSlotNumber("A-01");
 
-        when(slotRepository.findAll()).thenReturn(List.of(existing));
+        when(slotRepository.findAll())
+                .thenReturn(List.of(existing));
 
         var slotReq = new com.vps.dto.ParkingSlotRequest();
-        slotReq.setSlotNumber("a-01"); // lowercase should still conflict
+        slotReq.setSlotNumber("a-01");
         slotReq.setSlotType(ParkingSlot.SlotType.REGULAR);
 
         assertThatThrownBy(() -> parkingService.createSlot(slotReq))
@@ -263,12 +328,14 @@ class ParkingServiceTest {
                 .hasMessageContaining("already exists");
     }
 
-    // (11) Slot history ownership — customer cannot view another's vehicle history
+    // (11) Customer cannot view another user's vehicle history
     @Test
     void getParkingHistory_otherUserVehicle_throwsSecurityException() {
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findById(10L))
+                .thenReturn(Optional.of(vehicle));
 
-        assertThatThrownBy(() -> parkingService.getParkingHistory(10L, otherCustomer))
+        assertThatThrownBy(
+                () -> parkingService.getParkingHistory(10L, otherCustomer))
                 .isInstanceOf(SecurityException.class);
     }
 
@@ -279,10 +346,14 @@ class ParkingServiceTest {
         attendant.setId(99L);
         attendant.setRole(User.Role.PARKING_ATTENDANT);
 
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
-        when(recordRepository.findByVehicleIdOrderByEntryTimeDesc(10L)).thenReturn(List.of());
+        when(vehicleRepository.findById(10L))
+                .thenReturn(Optional.of(vehicle));
+
+        when(recordRepository.findByVehicleIdOrderByEntryTimeDesc(10L))
+                .thenReturn(List.of());
 
         var result = parkingService.getParkingHistory(10L, attendant);
+
         assertThat(result).isNotNull();
     }
 }
