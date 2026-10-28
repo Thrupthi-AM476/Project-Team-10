@@ -141,9 +141,16 @@ class ParkingServiceTest {
         when(recordRepository.findByVehicleIdAndStatus(
                 10L, RecordStatus.ACTIVE))
                 .thenReturn(Optional.empty());
-        when(slotRepository.findFirstByStatusAndSlotType(
+        when(slotRepository.findByStatusAndSlotType(
                 SlotStatus.AVAILABLE, ParkingSlot.SlotType.EV))
-                .thenReturn(Optional.of(evSlot));
+                .thenReturn(List.of(evSlot));
+
+        when(slotRepository.findByStatus(SlotStatus.AVAILABLE))
+                .thenReturn(List.of(evSlot));
+
+        when(reservationRepository.isSlotReservedAtTime(
+                eq(6L), any(LocalDateTime.class)))
+                .thenReturn(false);
 
         ParkingEntryResponse resp = parkingService.processEntry(req, customer);
 
@@ -151,11 +158,6 @@ class ParkingServiceTest {
         assertThat(resp.getSlotType()).isEqualTo("EV");
         assertThat(resp.getTicketId()).isNotBlank();
         assertThat(resp.getEntryTime()).isNotNull();
-
-        verify(slotRepository).findFirstByStatusAndSlotType(
-                SlotStatus.AVAILABLE, ParkingSlot.SlotType.EV);
-        verify(slotRepository, never())
-                .findFirstByStatus(SlotStatus.AVAILABLE);
     }
 
     // (2) Customer cannot park another user's vehicle
