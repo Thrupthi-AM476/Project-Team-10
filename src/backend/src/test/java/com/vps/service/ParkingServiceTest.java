@@ -124,6 +124,40 @@ class ParkingServiceTest {
                 argThat(s -> s.getStatus() == SlotStatus.OCCUPIED));
     }
 
+    @Test
+    void processEntry_preferredSlotType_isSelectedAndReturned() {
+        ParkingEntryRequest req = new ParkingEntryRequest();
+        req.setLicensePlate("KA01AB1234");
+        req.setSlotType("EV");
+
+        ParkingSlot evSlot = new ParkingSlot();
+        evSlot.setId(6L);
+        evSlot.setSlotNumber("EV-01");
+        evSlot.setSlotType(ParkingSlot.SlotType.EV);
+        evSlot.setStatus(SlotStatus.AVAILABLE);
+
+        when(vehicleService.getEntityByLicensePlate("KA01AB1234"))
+                .thenReturn(vehicle);
+        when(recordRepository.findByVehicleIdAndStatus(
+                10L, RecordStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(slotRepository.findFirstByStatusAndSlotType(
+                SlotStatus.AVAILABLE, ParkingSlot.SlotType.EV))
+                .thenReturn(Optional.of(evSlot));
+
+        ParkingEntryResponse resp = parkingService.processEntry(req, customer);
+
+        assertThat(resp.getSlotNumber()).isEqualTo("EV-01");
+        assertThat(resp.getSlotType()).isEqualTo("EV");
+        assertThat(resp.getTicketId()).isNotBlank();
+        assertThat(resp.getEntryTime()).isNotNull();
+
+        verify(slotRepository).findFirstByStatusAndSlotType(
+                SlotStatus.AVAILABLE, ParkingSlot.SlotType.EV);
+        verify(slotRepository, never())
+                .findFirstByStatus(SlotStatus.AVAILABLE);
+    }
+
     // (2) Customer cannot park another user's vehicle
     @Test
     void processEntry_otherUserVehicle_throwsSecurityException() {
