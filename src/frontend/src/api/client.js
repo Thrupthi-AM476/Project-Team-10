@@ -39,6 +39,12 @@ async function request(method, path, body = null, auth = true) {
   }
 
   if (!response.ok) {
+    // 401 = token expired or invalid — clear local auth state so the
+    // next protected-route render redirects to /login automatically.
+    if (response.status === 401) {
+      localStorage.removeItem('vps_token')
+      localStorage.removeItem('vps_user')
+    }
     const error = {
       success: false,
       message: data.message || 'Request failed',

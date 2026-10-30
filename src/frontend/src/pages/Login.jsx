@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { ErrorMessage, Field, LoadingSpinner } from '../components/ui'
+import { ErrorMessage } from '../components/ui'
 
 export function Login() {
   const { login } = useAuth()
@@ -11,6 +11,7 @@ export function Login() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -21,14 +22,20 @@ export function Login() {
     try {
       const res = await login(email, password)
       const role = res.data.role
-      const dest = from || (
-        role === 'ADMINISTRATOR' ? '/admin'
-        : role === 'PARKING_ATTENDANT' || role === 'MAINTENANCE_TECHNICIAN' ? '/staff'
-        : '/dashboard'
-      )
+      const dest =
+        from ||
+        (role === 'ADMINISTRATOR'
+          ? '/admin'
+          : role === 'PARKING_ATTENDANT' || role === 'MAINTENANCE_TECHNICIAN'
+          ? '/staff'
+          : '/dashboard')
       navigate(dest, { replace: true })
     } catch (err) {
-      setError(err.message || 'Login failed')
+      setError(
+        err.status === 403
+          ? 'Your account is locked or inactive. Contact an administrator.'
+          : err.message || 'Invalid email or password.'
+      )
     } finally {
       setLoading(false)
     }
@@ -36,35 +43,84 @@ export function Login() {
 
   return (
     <div className="auth-page">
-      <h1>Welcome Back</h1>
-      <p>Log in to your Vehicle Parking System account</p>
+      <a href="#main-form" className="skip-link">Skip to form</a>
 
-      {error && <ErrorMessage message={error} onDismiss={() => setError('')} />}
+      <div className="auth-logo">
+        <div className="auth-logo-icon">🅿</div>
+        <h1>Welcome back</h1>
+        <p className="auth-subtitle">Sign in to your VPS account</p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="card">
-        <Field label="Email" htmlFor="email">
+      {error && (
+        <ErrorMessage message={error} onDismiss={() => setError('')} />
+      )}
+
+      <form id="main-form" onSubmit={handleSubmit} className="card" noValidate>
+        <div className="field">
+          <label htmlFor="email">Email address</label>
           <input
-            id="email" type="email" value={email}
-            onChange={e => setEmail(e.target.value)} required
-            autoComplete="email" placeholder="you@example.com"
+            id="email"
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            placeholder="you@example.com"
+            aria-required="true"
+            aria-describedby={error ? 'login-error' : undefined}
           />
-        </Field>
+        </div>
 
-        <Field label="Password" htmlFor="password">
-          <input
-            id="password" type="password" value={password}
-            onChange={e => setPassword(e.target.value)} required
-            autoComplete="current-password" placeholder="••••••••"
-          />
-        </Field>
+        <div className="field">
+          <div className="flex-between mb-05">
+            <label htmlFor="password">Password</label>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <input
+              id="password"
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              placeholder="••••••••"
+              aria-required="true"
+              style={{ paddingRight: '3rem' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw(v => !v)}
+              aria-label={showPw ? 'Hide password' : 'Show password'}
+              style={{
+                position: 'absolute', right: '.75rem', top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--gray-400)', fontSize: '.9rem', padding: '.2rem',
+              }}
+            >
+              {showPw ? '🙈' : '👁'}
+            </button>
+          </div>
+        </div>
 
-        <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-          {loading ? 'Logging in…' : 'Login'}
+        <button
+          type="submit"
+          className="btn btn-primary btn-block"
+          disabled={loading}
+          aria-busy={loading}
+        >
+          {loading ? (
+            <>
+              <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} aria-hidden="true" />
+              Signing in…
+            </>
+          ) : 'Sign in'}
         </button>
       </form>
 
       <p className="text-center mt-1 text-sm text-gray">
-        Don't have an account? <Link to="/register">Register here</Link>
+        Don't have an account?{' '}
+        <Link to="/register" className="font-medium">Create one</Link>
       </p>
     </div>
   )

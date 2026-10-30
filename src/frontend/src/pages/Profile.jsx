@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
 import { userApi } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { Card, LoadingSpinner, ErrorMessage, SuccessMessage, Field, Badge } from '../components/ui'
+import { Card, LoadingSpinner, ErrorMessage, SuccessMessage, Badge } from '../components/ui'
 
 export function Profile() {
   const { user, updateUser } = useAuth()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [fetchError, setFetchError] = useState('')
+  const [formError, setFormError] = useState('')
   const [success, setSuccess] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const [form, setForm] = useState({ fullName: '', phone: '' })
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState('')
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -21,7 +22,7 @@ export function Profile() {
         setProfile(res.data)
         setForm({ fullName: res.data.fullName || '', phone: res.data.phone || '' })
       } catch (err) {
-        setError(err.message)
+        setFetchError(err.message || 'Could not load profile.')
       } finally {
         setLoading(false)
       }
@@ -29,18 +30,29 @@ export function Profile() {
     load()
   }, [])
 
-  const handleSubmit = async (e) => {
+  const handleChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+    setDirty(true)
+    setSuccess('')
+    setFormError('')
+  }
+
+  const handleSubmit = async e => {
     e.preventDefault()
     setFormError('')
-    if (!form.fullName.trim()) { setFormError('Full name is required'); return }
+    if (!form.fullName.trim()) {
+      setFormError('Full name is required.')
+      return
+    }
     setSaving(true)
     try {
       const res = await userApi.updateProfile(form)
       setProfile(res.data)
       updateUser({ fullName: res.data.fullName })
-      setSuccess('Profile updated successfully')
+      setSuccess('Profile updated successfully.')
+      setDirty(false)
     } catch (err) {
-      setFormError(err.message)
+      setFormError(err.message || 'Could not save changes.')
     } finally {
       setSaving(false)
     }
@@ -48,58 +60,133 @@ export function Profile() {
 
   if (loading) return <LoadingSpinner label="Loading profile…" />
 
+  const joinDate = profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  }) : '—'
+
   return (
-    <div>
+    <main>
       <div className="page-header">
         <h1>My Profile</h1>
-        <p>View and update your account information</p>
+        <p>View and update your account details</p>
       </div>
 
-      {error && <ErrorMessage message={error} onDismiss={() => setError('')} />}
-      {success && <SuccessMessage message={success} />}
+      {fetchError && <ErrorMessage message={fetchError} />}
+      {success    && <SuccessMessage message={success} />}
 
       <div className="grid-2">
+        {/* Account info */}
         <Card>
-          <h3 className="mb-1">Account Details</h3>
-          <div className="receipt-row"><span>Name</span><strong>{profile?.fullName}</strong></div>
-          <div className="receipt-row"><span>Email</span><strong>{profile?.email}</strong></div>
-          <div className="receipt-row"><span>Phone</span><strong>{profile?.phone || 'Not set'}</strong></div>
-          <div className="receipt-row">
-            <span>Role</span>
-            <Badge variant="primary">{profile?.role?.replace(/_/g, ' ').toLowerCase()}</Badge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{
+              width: 52, height: 52,
+              borderRadius: '50%',
+              background: 'var(--primary)',
+              color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.35rem', fontWeight: 700, flexShrink: 0,
+            }}>
+              {profile?.fullName?.[0]?.toUpperCase() || '?'}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{profile?.fullName}</div>
+              <div className="text-sm text-gray">{profile?.email}</div>
+            </div>
           </div>
-          <div className="receipt-row">
-            <span>Status</span>
-            <Badge variant={profile?.isActive ? 'success' : 'danger'}>
-              {profile?.isActive ? 'Active' : 'Inactive'}
-            </Badge>
+
+          <p className="section-title">Account Details</p>
+          <div className="info-list">
+            <div className="info-row">
+              <span className="info-label">Full name</span>
+              <span className="info-value">{profile?.fullName}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Email</span>
+              <span className="info-value" style={{ fontSize: '.85rem' }}>{profile?.email}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Phone</span>
+              <span className="info-value">{profile?.phone || <span className="text-muted">Not set</span>}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Role</span>
+              <Badge variant="primary">
+                {profile?.role?.replace(/_/g, ' ').toLowerCase()}
+              </Badge>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Account status</span>
+              <Badge variant={profile?.isActive ? 'success' : 'danger'}>
+                {profile?.isActive ? 'Active' : 'Inactive'}
+              </Badge>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Member since</span>
+              <span className="info-value">{joinDate}</span>
+            </div>
           </div>
-          <div className="receipt-row"><span>Member Since</span><span>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '—'}</span></div>
         </Card>
 
+        {/* Edit form */}
         <Card>
-          <h3 className="mb-1">Update Profile</h3>
-          <p className="text-sm text-gray mb-1">You can update your full name and phone number.</p>
+          <p className="section-title">Edit Profile</p>
+
           {formError && <ErrorMessage message={formError} onDismiss={() => setFormError('')} />}
-          <form onSubmit={handleSubmit}>
-            <Field label="Full Name" htmlFor="profile-name">
-              <input id="profile-name" type="text" value={form.fullName}
-                onChange={e => setForm(prev => ({ ...prev, fullName: e.target.value }))} required />
-            </Field>
-            <Field label="Phone" htmlFor="profile-phone">
-              <input id="profile-phone" type="tel" value={form.phone}
-                onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="9876543210" />
-            </Field>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : 'Save Changes'}
+
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="field">
+              <label htmlFor="p-name">
+                Full name <span aria-hidden="true" style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <input
+                id="p-name"
+                type="text"
+                value={form.fullName}
+                onChange={e => handleChange('fullName', e.target.value)}
+                required
+                autoComplete="name"
+                aria-required="true"
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="p-phone">
+                Phone <span className="text-muted text-xs">(optional)</span>
+              </label>
+              <input
+                id="p-phone"
+                type="tel"
+                value={form.phone}
+                onChange={e => handleChange('phone', e.target.value)}
+                autoComplete="tel"
+                placeholder="9876543210"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={saving || !dirty}
+              aria-busy={saving}
+            >
+              {saving ? (
+                <>
+                  <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} aria-hidden="true" />
+                  Saving…
+                </>
+              ) : 'Save Changes'}
             </button>
           </form>
-          <p className="text-sm text-gray mt-1">
-            Role, account status, and password are managed by administrators and cannot be changed here.
-          </p>
+
+          <div className="notice mt-2">
+            <span>ℹ️</span>
+            <span>
+              Email, role, and account status can only be changed by an administrator.
+              Password changes are not supported in the current release.
+            </span>
+          </div>
         </Card>
       </div>
-    </div>
+    </main>
   )
 }

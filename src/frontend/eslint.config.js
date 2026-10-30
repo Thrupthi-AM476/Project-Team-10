@@ -10,11 +10,10 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.node,
-        import.meta: 'readonly',
       },
     },
     rules: {
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-undef': 'off',
     },
     ignores: ['dist/', 'node_modules/'],
