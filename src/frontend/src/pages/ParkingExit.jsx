@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { parkingApi } from '../api/client'
-import { Card, LoadingSpinner, ErrorMessage, SuccessMessage, Field, EmptyState } from '../components/ui'
+import { Card, LoadingSpinner, ErrorMessage, SuccessMessage, Field } from '../components/ui'
 
 export function ParkingExit() {
   const [activeSession, setActiveSession] = useState(null)
@@ -83,7 +83,7 @@ export function ParkingExit() {
             <Link to="/parking" className="btn btn-secondary">Back to Parking</Link>
           </div>
         </Card>
-      ) : activeSession || ticketId ? (
+      ) : activeSession ? (
         <Card>
           <h3 className="mb-1">Process Exit</h3>
           {activeSession && (
@@ -112,8 +112,30 @@ export function ParkingExit() {
           </form>
         </Card>
       ) : (
-        <EmptyState title="No active parking session" message="You don't have an active parking session to exit."
-          action={<Link to="/parking/session" className="btn btn-primary btn-sm">Park a Vehicle</Link>} />
+        <Card>
+          <h3 className="mb-1">Process Exit</h3>
+          <p className="text-sm text-gray mb-1">
+            No active parking session found. You can enter a ticket ID manually to process exit and payment.
+          </p>
+          <form onSubmit={handleExit}>
+            <Field label="Ticket ID" htmlFor="ticketId">
+              <input id="ticketId" type="text" value={ticketId}
+                onChange={e => setTicketId(e.target.value)} required
+                placeholder="TKT-20261022-00001" />
+            </Field>
+            <Field label="Payment Method" htmlFor="paymentMethod">
+              <select id="paymentMethod" value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value)}>
+                <option value="CASH">Cash</option>
+                <option value="CARD">Card</option>
+                <option value="DIGITAL_WALLET">Digital Wallet</option>
+              </select>
+            </Field>
+            <button type="submit" className="btn btn-primary" disabled={processing}>
+              {processing ? 'Processing…' : 'Process Exit & Pay'}
+            </button>
+          </form>
+        </Card>
       )}
     </div>
   )

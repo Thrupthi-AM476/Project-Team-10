@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
-import { ProtectedRoute, RoleRoute } from './components/ProtectedRoute'
+import { ProtectedRoute } from './components/ProtectedRoute'
 import { Landing } from './pages/Landing'
 import { Register } from './pages/Register'
 import { Login } from './pages/Login'
@@ -22,15 +22,14 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Customer + staff authenticated routes */}
+        {/* Public availability display; parking operations remain protected. */}
+        <Route path="/parking" element={<ParkingAvailability />} />
+
         <Route path="/dashboard" element={
           <ProtectedRoute><CustomerDashboard /></ProtectedRoute>
         } />
         <Route path="/vehicles" element={
           <ProtectedRoute><Vehicles /></ProtectedRoute>
-        } />
-        <Route path="/parking" element={
-          <ProtectedRoute><ParkingAvailability /></ProtectedRoute>
         } />
         <Route path="/parking/session" element={
           <ProtectedRoute><ParkingSession /></ProtectedRoute>
@@ -45,14 +44,13 @@ export default function App() {
           <ProtectedRoute><Profile /></ProtectedRoute>
         } />
 
-        {/* Staff-only routes */}
+        {/* Slot management is restricted to attendants and administrators. */}
         <Route path="/staff" element={
-          <ProtectedRoute roles={['PARKING_ATTENDANT', 'ADMINISTRATOR', 'MAINTENANCE_TECHNICIAN']}>
+          <ProtectedRoute roles={['PARKING_ATTENDANT', 'ADMINISTRATOR']}>
             <StaffDashboard />
           </ProtectedRoute>
         } />
 
-        {/* Admin-only routes */}
         <Route path="/admin" element={
           <ProtectedRoute roles={['ADMINISTRATOR']}>
             <AdminDashboard />

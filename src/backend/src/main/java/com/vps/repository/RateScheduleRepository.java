@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface RateScheduleRepository extends JpaRepository<RateSchedule, Long> {
     Optional<RateSchedule> findFirstByVehicleTypeAndIsActiveTrue(VehicleType vehicleType);
     List<RateSchedule> findByIsActiveTrue();
+    List<RateSchedule> findByVehicleTypeAndIsActiveTrue(VehicleType vehicleType);
 }

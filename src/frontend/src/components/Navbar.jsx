@@ -13,7 +13,10 @@ export function Navbar() {
     navigate('/')
   }
 
-  // Role-aware navigation links
+  const publicLinks = [
+    { to: '/parking', label: 'Parking Availability' },
+  ]
+
   const customerLinks = [
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/vehicles', label: 'Vehicles' },
@@ -22,23 +25,35 @@ export function Navbar() {
     { to: '/profile', label: 'Profile' },
   ]
 
-  const staffLinks = [
+  const attendantLinks = [
     { to: '/staff', label: 'Staff Dashboard' },
     { to: '/parking', label: 'Parking' },
     { to: '/vehicles', label: 'Vehicles' },
+    { to: '/reservations', label: 'Reservations' },
+    { to: '/profile', label: 'Profile' },
+  ]
+
+  // Maintenance technicians retain general access but not slot-management UI.
+  const maintenanceLinks = [
+    { to: '/parking', label: 'Parking' },
+    { to: '/vehicles', label: 'Vehicles' },
+    { to: '/reservations', label: 'Reservations' },
     { to: '/profile', label: 'Profile' },
   ]
 
   const adminLinks = [
     { to: '/admin', label: 'Admin' },
+    { to: '/staff', label: 'Staff Dashboard' },
     { to: '/parking', label: 'Parking' },
     { to: '/vehicles', label: 'Vehicles' },
+    { to: '/reservations', label: 'Reservations' },
     { to: '/profile', label: 'Profile' },
   ]
 
-  let links = []
+  let links = publicLinks
   if (user?.role === 'ADMINISTRATOR') links = adminLinks
-  else if (user?.role === 'PARKING_ATTENDANT' || user?.role === 'MAINTENANCE_TECHNICIAN') links = staffLinks
+  else if (user?.role === 'PARKING_ATTENDANT') links = attendantLinks
+  else if (user?.role === 'MAINTENANCE_TECHNICIAN') links = maintenanceLinks
   else if (isAuthenticated) links = customerLinks
 
   const roleLabel = user?.role?.replace(/_/g, ' ').toLowerCase()

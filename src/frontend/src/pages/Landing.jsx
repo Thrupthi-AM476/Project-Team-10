@@ -4,20 +4,19 @@ import { useAuth } from '../context/AuthContext'
 export function Landing() {
   const { isAuthenticated, user } = useAuth()
 
+  // Routing: MAINTENANCE_TECHNICIAN not given /staff per teammate's routing decision
   const dashboardPath =
-    user?.role === 'ADMINISTRATOR'
-      ? '/admin'
-      : user?.role === 'PARKING_ATTENDANT' || user?.role === 'MAINTENANCE_TECHNICIAN'
-      ? '/staff'
-      : '/dashboard'
+    user?.role === 'ADMINISTRATOR' ? '/admin'
+      : user?.role === 'PARKING_ATTENDANT' ? '/staff'
+        : '/dashboard'
 
   const features = [
-    { icon: '🚗', title: 'Vehicle Management',     desc: 'Register and manage vehicles with unique license-plate tracking and ownership protection.' },
-    { icon: '🅿', title: 'Smart Slot Allocation',  desc: 'Real-time slot availability display and automatic allocation on entry.' },
-    { icon: '🎫', title: 'Digital Entry Tickets',  desc: 'Instant ticket generation with QR-ready IDs for every parking session.' },
-    { icon: '💳', title: 'Automated Fee Calc',     desc: 'Duration-based fee calculation with grace period and configurable rates.' },
-    { icon: '📅', title: 'Advance Reservations',   desc: 'Book parking slots in advance with conflict prevention and auto-expiry.' },
-    { icon: '📊', title: 'Admin Dashboard',        desc: 'Monitor occupancy, revenue, user activity, and export date-filtered reports.' },
+    { icon: '🚗', title: 'Vehicle Management',    desc: 'Register and manage vehicles with unique license-plate tracking and ownership protection.' },
+    { icon: '🅿', title: 'Smart Slot Allocation', desc: 'Real-time slot availability display and automatic allocation on entry.' },
+    { icon: '🎫', title: 'Digital Entry Tickets', desc: 'Instant ticket generation with QR-ready IDs for every parking session.' },
+    { icon: '💳', title: 'Automated Fee Calc',    desc: 'Duration-based fee calculation with grace period and configurable rates.' },
+    { icon: '📅', title: 'Advance Reservations',  desc: 'Book parking slots in advance with conflict prevention and auto-expiry.' },
+    { icon: '📊', title: 'Admin Dashboard',       desc: 'Monitor occupancy, revenue, user activity, and export date-filtered reports.' },
   ]
 
   return (
@@ -39,6 +38,10 @@ export function Landing() {
             <>
               <Link to="/register" className="btn btn-primary btn-lg">
                 Get Started Free
+              </Link>
+              {/* Public link preserved from teammate's change (parking is public per App.jsx) */}
+              <Link to="/parking" className="btn btn-secondary btn-lg">
+                View Parking
               </Link>
               <Link
                 to="/login"
@@ -63,7 +66,7 @@ export function Landing() {
         ))}
       </div>
 
-      {/* CTA strip */}
+      {/* CTA strip for unauthenticated visitors */}
       {!isAuthenticated && (
         <div
           style={{
