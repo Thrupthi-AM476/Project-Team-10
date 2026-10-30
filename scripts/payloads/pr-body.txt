@@ -1,0 +1,71 @@
+## Sprint 2 Frontend — Issues #32 #33 #34 #35 #44 #48 #49
+
+This PR delivers Thrupthi-AM476's Sprint 2 frontend assignments on top of all merged teammate work (PRs #51–#55).
+
+---
+
+### What is implemented
+
+**#32 — React + Vite frontend setup**
+- Vite 5, React 18, React Router 6, AuthContext, centralized API client
+- Role-aware ProtectedRoute with redirect-to-origin support
+
+**#33 — Login and registration pages**
+- Login: show/hide password toggle, spinner on submit, 403 vs 400 error distinction
+- Register: real-time password rule checklist (5 rules matching backend regex), strength bar (weak/medium/strong), confirm-password with live match feedback, onBlur field-level errors, submit disabled until all requirements met
+
+**#34 — Customer dashboard and profile**
+- Dashboard: first-name greeting, stat cards with icons, vehicle preview with type icons, active session card with time-since display, quick-actions panel
+- Profile: avatar circle, info-list layout, dirty-state detection (Save disabled when unchanged), notice panel explaining locked fields
+
+**#35 — Vehicle management UI**
+- Extracted `VehicleForm` component with own validation state
+- Plate validated client-side against backend's regex (2–20 alphanumeric/hyphen, auto-uppercased)
+- Vehicle table: type icons (🚗🏍🚚⚡), make/model combined, aria-labels on buttons
+- Ghost-style deactivate button visually distinct from edit
+
+**#44 — Frontend-backend API integration**
+- All API paths verified against actual backend controllers
+- 401 response clears localStorage so ProtectedRoute redirects to /login automatically
+- Backend error messages propagated to UI; never hardcoded
+
+**#48 — Responsive layout and accessibility**
+- Full design system in `index.css`: Inter font, design tokens, consistent spacing/shadows
+- Responsive navbar with hamburger at 768px
+- Skip-to-content link for keyboard navigation
+- `focus-visible` outlines on all interactive elements
+- `aria-required`, `aria-describedby`, `aria-label`, `aria-busy`, `aria-live`, `role=alert` throughout
+- No horizontal overflow at 375px verified
+
+**#49 — Merge feature branch**
+- Branch merged with origin/main (PRs #51–#55 integrated)
+- Conflict in Landing.jsx resolved: teammate's /parking public button preserved, our improved button styling applied
+
+---
+
+### Teammate work preserved
+
+All changes from teammates are preserved untouched:
+- adik1611: RateScheduleService, parking availability, Reservations UI, StaffDashboard (PRs #53, #54, #25)
+- Vikas75bit: ParkingExit manual ticket entry, ParkingServiceTest fix (PRs #51, #52, #55)
+- Files not touched: App.jsx, Navbar.jsx, ParkingExit.jsx, Reservations.jsx, StaffDashboard.jsx, ParkingAvailability.jsx, all backend files
+
+---
+
+### Test results (post-merge)
+
+```
+npm run build   73 tests, 0 failures — BUILD SUCCESS (1.69s)
+npm run lint    0 errors, 0 warnings
+mvn test        73 tests, 0 failures, 0 errors — BUILD SUCCESS
+```
+
+---
+
+### Review notes
+
+- Do NOT merge without at least one teammate review
+- No secrets or credentials committed (application.properties DB password comes from main, not this branch)
+- No force pushes used; all teammate commits preserved
+
+Closes #32 #33 #34 #35 #44 #48 #49
