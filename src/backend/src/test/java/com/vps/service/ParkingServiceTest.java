@@ -7,6 +7,7 @@ import com.vps.dto.ParkingExitResponse;
 import com.vps.entity.*;
 import com.vps.entity.ParkingRecord.RecordStatus;
 import com.vps.entity.ParkingSlot.SlotStatus;
+import com.vps.entity.Payment.PaymentMethod;
 import com.vps.entity.Payment.PaymentStatus;
 import com.vps.entity.Vehicle.VehicleType;
 import com.vps.repository.*;
@@ -246,6 +247,24 @@ class ParkingServiceTest {
 
         assertThat(resp.getReceiptId()).isNotEmpty();
         assertThat(resp.getPaymentStatus()).isEqualTo("SUCCESS");
+        assertThat(resp.getTicketId()).isEqualTo("TKT-20261022-00001");
+        assertThat(resp.getPaymentMethod()).isEqualTo("CASH");
+        assertThat(resp.getLicensePlate()).isEqualTo(vehicle.getLicensePlate());
+        assertThat(resp.getSlotNumber()).isEqualTo(slot.getSlotNumber());
+        assertThat(resp.getEntryTime()).isEqualTo(record.getEntryTime());
+        assertThat(resp.getExitTime()).isNotNull();
+        assertThat(resp.getDurationMinutes()).isGreaterThan(0);
+        assertThat(resp.getFeeAmount()).isNotNull();
+        assertThat(resp.getCurrency()).isEqualTo("INR");
+
+        assertThat(record.getStatus()).isEqualTo(RecordStatus.COMPLETED);
+        assertThat(record.getExitTime()).isNotNull();
+        assertThat(record.getDurationMinutes()).isGreaterThan(0);
+        assertThat(record.getFeeAmount()).isNotNull();
+
+        verify(paymentRepository).save(argThat(payment ->
+                payment.getPaymentStatus() == PaymentStatus.SUCCESS
+                        && payment.getPaymentMethod() == PaymentMethod.CASH));
 
         verify(slotRepository).save(
                 argThat(s -> s.getStatus() == SlotStatus.AVAILABLE));
@@ -294,6 +313,22 @@ class ParkingServiceTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    // Reject exit when ticket does not exist
+    @Test
+    void processExit_ticketNotFound_throwsIllegalArgumentException() {
+        ParkingExitRequest req = new ParkingExitRequest();
+        req.setTicketId("INVALID-TICKET");
+        req.setPaymentMethod("CASH");
+
+        when(recordRepository.findByTicketId("INVALID-TICKET"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(
+                () -> parkingService.processExit(req, customer))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Ticket not found");
+    }
+
     // (8) Fee within grace period is zero
     @Test
     void processExit_withinGracePeriod_feeIsZero() {
@@ -321,6 +356,33 @@ class ParkingServiceTest {
 
         assertThat(resp.getFeeAmount())
                 .isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void processExit_afterGracePeriod_calculatesFeeAndRecordsPayment() {
+        ParkingExitRequest req = new ParkingExitRequest();
+        req.setTicketId("TICKET-123");
+        req.setPaymentMethod("CASH");
+
+        ParkingRecord record = new ParkingRecord();
+        record.setTicketId("TICKET-123");
+        record.setStatus(RecordStatus.ACTIVE);
+        record.setEntryTime(LocalDateTime.now().minusMinutes(120));
+        record.setVehicle(vehicle);
+        record.setSlot(slot);
+
+        when(recordRepository.findByTicketId("TICKET-123"))
+                .thenReturn(Optional.of(record));
+        when(rateScheduleRepository.findFirstByVehicleTypeAndIsActiveTrue(vehicle.getVehicleType()))
+                .thenReturn(Optional.of(rate));
+
+        ParkingExitResponse response = parkingService.processExit(req, customer);
+
+        assertThat(response.getFeeAmount()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(response.getPaymentMethod()).isEqualTo("CASH");
+        assertThat(response.getPaymentStatus()).isEqualTo("SUCCESS");
+
+        verify(paymentRepository).save(any(Payment.class));
     }
 
     // (9) Staff can create a slot
