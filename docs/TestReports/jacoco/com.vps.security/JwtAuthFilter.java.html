@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtAuthFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Vehicle Parking System - Backend</a> &gt; <a href="index.source.html" class="el_package">com.vps.security</a> &gt; <span class="el_source">JwtAuthFilter.java</span></div><h1>JwtAuthFilter.java</h1><pre class="source lang-java linenums">package com.vps.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+@Component
+@RequiredArgsConstructor
+public class JwtAuthFilter extends OncePerRequestFilter {
+
+    private final JwtUtil jwtUtil;
+    private final UserDetailsServiceImpl userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+<span class="fc" id="L31">        String token = extractToken(request);</span>
+
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">        if (token != null &amp;&amp; jwtUtil.validateToken(token)) {</span>
+<span class="fc" id="L34">            String email = jwtUtil.getEmailFromToken(token);</span>
+<span class="fc" id="L35">            UserDetails userDetails = userDetailsService.loadUserByUsername(email);</span>
+
+<span class="fc" id="L37">            UsernamePasswordAuthenticationToken auth =</span>
+                    new UsernamePasswordAuthenticationToken(
+<span class="fc" id="L39">                            userDetails, null, userDetails.getAuthorities());</span>
+<span class="fc" id="L40">            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));</span>
+<span class="fc" id="L41">            SecurityContextHolder.getContext().setAuthentication(auth);</span>
+        }
+
+<span class="fc" id="L44">        filterChain.doFilter(request, response);</span>
+<span class="fc" id="L45">    }</span>
+
+    private String extractToken(HttpServletRequest request) {
+<span class="fc" id="L48">        String header = request.getHeader(&quot;Authorization&quot;);</span>
+<span class="pc bpc" id="L49" title="1 of 4 branches missed.">        if (StringUtils.hasText(header) &amp;&amp; header.startsWith(&quot;Bearer &quot;)) {</span>
+<span class="fc" id="L50">            return header.substring(7);</span>
+        }
+<span class="fc" id="L52">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VehicleService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Vehicle Parking System - Backend</a> &gt; <a href="index.source.html" class="el_package">com.vps.service</a> &gt; <span class="el_source">VehicleService.java</span></div><h1>VehicleService.java</h1><pre class="source lang-java linenums">package com.vps.service;
+
+import com.vps.dto.VehicleRequest;
+import com.vps.dto.VehicleResponse;
+import com.vps.entity.User;
+import com.vps.entity.Vehicle;
+import com.vps.repository.VehicleRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class VehicleService {
+
+    private final VehicleRepository vehicleRepository;
+    private final AuditLogService auditLogService;
+
+    public VehicleResponse addVehicle(VehicleRequest request, User owner) {
+        // VPS-F-001: prevent duplicate license plates
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (vehicleRepository.existsByLicensePlate(request.getLicensePlate().toUpperCase())) {</span>
+<span class="fc" id="L24">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L25">                    &quot;Vehicle with license plate &quot; + request.getLicensePlate() + &quot; already exists&quot;);</span>
+        }
+
+<span class="fc" id="L28">        Vehicle vehicle = new Vehicle();</span>
+<span class="fc" id="L29">        vehicle.setLicensePlate(request.getLicensePlate().toUpperCase());</span>
+<span class="fc" id="L30">        vehicle.setMake(request.getMake());</span>
+<span class="fc" id="L31">        vehicle.setModel(request.getModel());</span>
+<span class="fc" id="L32">        vehicle.setColor(request.getColor());</span>
+<span class="fc" id="L33">        vehicle.setVehicleType(request.getVehicleType());</span>
+<span class="fc" id="L34">        vehicle.setUser(owner);</span>
+
+<span class="fc" id="L36">        vehicleRepository.save(vehicle);</span>
+<span class="fc" id="L37">        auditLogService.log(owner, &quot;VEHICLE_ADDED&quot;, &quot;VEHICLE&quot;, vehicle.getId(),</span>
+<span class="fc" id="L38">                &quot;Vehicle added: &quot; + vehicle.getLicensePlate());</span>
+
+<span class="fc" id="L40">        return toResponse(vehicle);</span>
+    }
+
+    public List&lt;VehicleResponse&gt; getVehiclesForUser(Long userId) {
+<span class="fc" id="L44">        return vehicleRepository.findByUserIdAndIsActiveTrue(userId)</span>
+<span class="fc" id="L45">                .stream().map(this::toResponse).collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Return active and inactive vehicles to staff so the oversight table can
+     * display the status of every registered vehicle. Customer queries remain
+     * restricted to the customer's active vehicles by getVehiclesForUser.
+     */
+    public List&lt;VehicleResponse&gt; getAllVehicles() {
+<span class="fc" id="L54">        return vehicleRepository.findAll()</span>
+<span class="fc" id="L55">                .stream().map(this::toResponse).collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Ownership-aware lookup by ID.
+     * CUSTOMER may only see their own vehicle; ADMINISTRATOR and PARKING_ATTENDANT may see any.
+     */
+    public VehicleResponse getVehicleById(Long vehicleId, User requester) {
+<span class="fc" id="L63">        Vehicle vehicle = vehicleRepository.findById(vehicleId)</span>
+<span class="pc" id="L64">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;Vehicle not found: &quot; + vehicleId));</span>
+
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (requester.getRole() == User.Role.CUSTOMER</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                &amp;&amp; !vehicle.getUser().getId().equals(requester.getId())) {</span>
+<span class="fc" id="L68">            throw new SecurityException(&quot;Not authorized to view this vehicle&quot;);</span>
+        }
+
+<span class="fc" id="L71">        return toResponse(vehicle);</span>
+    }
+
+    /**
+     * Ownership-aware lookup by plate.
+     * Preserves the zero-argument overload used by ParkingService / ReservationService.
+     */
+    public VehicleResponse getByLicensePlate(String licensePlate, User requester) {
+<span class="fc" id="L79">        Vehicle vehicle = vehicleRepository.findByLicensePlate(licensePlate.toUpperCase())</span>
+<span class="pc" id="L80">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                        &quot;Vehicle not found: &quot; + licensePlate));
+
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (requester.getRole() == User.Role.CUSTOMER</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                &amp;&amp; !vehicle.getUser().getId().equals(requester.getId())) {</span>
+<span class="fc" id="L85">            throw new SecurityException(&quot;Not authorized to view this vehicle&quot;);</span>
+        }
+
+<span class="fc" id="L88">        return toResponse(vehicle);</span>
+    }
+
+    public VehicleResponse updateVehicle(Long vehicleId, VehicleRequest request, User requester) {
+<span class="fc" id="L92">        Vehicle vehicle = vehicleRepository.findById(vehicleId)</span>
+<span class="pc" id="L93">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;Vehicle not found&quot;));</span>
+
+        // Only owner or admin can update
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!vehicle.getUser().getId().equals(requester.getId())</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                &amp;&amp; requester.getRole() != User.Role.ADMINISTRATOR) {</span>
+<span class="fc" id="L98">            throw new SecurityException(&quot;Not authorized to update this vehicle&quot;);</span>
+        }
+
+        // If license plate changed, check for duplicate
+<span class="fc" id="L102">        String newPlate = request.getLicensePlate().toUpperCase();</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (!vehicle.getLicensePlate().equals(newPlate)</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                &amp;&amp; vehicleRepository.existsByLicensePlate(newPlate)) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(&quot;License plate &quot; + newPlate + &quot; already in use&quot;);</span>
+        }
+
+<span class="fc" id="L108">        vehicle.setLicensePlate(newPlate);</span>
+<span class="fc" id="L109">        vehicle.setMake(request.getMake());</span>
+<span class="fc" id="L110">        vehicle.setModel(request.getModel());</span>
+<span class="fc" id="L111">        vehicle.setColor(request.getColor());</span>
+<span class="fc" id="L112">        vehicle.setVehicleType(request.getVehicleType());</span>
+<span class="fc" id="L113">        vehicleRepository.save(vehicle);</span>
+
+<span class="fc" id="L115">        auditLogService.log(requester, &quot;VEHICLE_UPDATED&quot;, &quot;VEHICLE&quot;, vehicle.getId(),</span>
+<span class="fc" id="L116">                &quot;Vehicle updated: &quot; + vehicle.getLicensePlate());</span>
+<span class="fc" id="L117">        return toResponse(vehicle);</span>
+    }
+
+    public void deactivateVehicle(Long vehicleId, User requester) {
+<span class="fc" id="L121">        Vehicle vehicle = vehicleRepository.findById(vehicleId)</span>
+<span class="pc" id="L122">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;Vehicle not found&quot;));</span>
+
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (!vehicle.getUser().getId().equals(requester.getId())</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                &amp;&amp; requester.getRole() != User.Role.ADMINISTRATOR</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                &amp;&amp; requester.getRole() != User.Role.PARKING_ATTENDANT) {</span>
+<span class="fc" id="L127">            throw new SecurityException(&quot;Not authorized to delete this vehicle&quot;);</span>
+        }
+
+<span class="fc" id="L130">        vehicle.setActive(false);</span>
+<span class="fc" id="L131">        vehicleRepository.save(vehicle);</span>
+
+<span class="fc" id="L133">        auditLogService.log(requester, &quot;VEHICLE_DEACTIVATED&quot;, &quot;VEHICLE&quot;, vehicle.getId(),</span>
+<span class="fc" id="L134">                &quot;Vehicle deactivated: &quot; + vehicle.getLicensePlate());</span>
+<span class="fc" id="L135">    }</span>
+
+    public VehicleResponse getByLicensePlate(String licensePlate) {
+<span class="nc" id="L138">        Vehicle vehicle = vehicleRepository.findByLicensePlate(licensePlate.toUpperCase())</span>
+<span class="nc" id="L139">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                        &quot;Vehicle not found: &quot; + licensePlate));
+<span class="nc" id="L141">        return toResponse(vehicle);</span>
+    }
+
+    public Vehicle getEntityByLicensePlate(String licensePlate) {
+<span class="fc" id="L145">        return vehicleRepository.findByLicensePlate(licensePlate.toUpperCase())</span>
+<span class="pc" id="L146">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                        &quot;Vehicle not found: &quot; + licensePlate));
+    }
+
+    private VehicleResponse toResponse(Vehicle vehicle) {
+<span class="fc" id="L151">        VehicleResponse response = new VehicleResponse();</span>
+<span class="fc" id="L152">        response.setId(vehicle.getId());</span>
+<span class="fc" id="L153">        response.setLicensePlate(vehicle.getLicensePlate());</span>
+<span class="fc" id="L154">        response.setMake(vehicle.getMake());</span>
+<span class="fc" id="L155">        response.setModel(vehicle.getModel());</span>
+<span class="fc" id="L156">        response.setColor(vehicle.getColor());</span>
+<span class="fc" id="L157">        response.setVehicleType(vehicle.getVehicleType());</span>
+<span class="fc" id="L158">        response.setUserId(vehicle.getUser().getId());</span>
+<span class="fc" id="L159">        response.setOwnerName(vehicle.getUser().getFullName());</span>
+<span class="fc" id="L160">        response.setActive(vehicle.isActive());</span>
+<span class="fc" id="L161">        response.setCreatedAt(vehicle.getCreatedAt());</span>
+<span class="fc" id="L162">        return response;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

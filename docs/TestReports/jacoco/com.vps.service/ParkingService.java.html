@@ -1,0 +1,451 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParkingService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Vehicle Parking System - Backend</a> &gt; <a href="index.source.html" class="el_package">com.vps.service</a> &gt; <span class="el_source">ParkingService.java</span></div><h1>ParkingService.java</h1><pre class="source lang-java linenums">package com.vps.service;
+
+import com.vps.dto.*;
+import com.vps.entity.*;
+import com.vps.entity.ParkingRecord.RecordStatus;
+import com.vps.entity.ParkingSlot.SlotStatus;
+import com.vps.entity.ParkingSlot.SlotType;
+import com.vps.entity.Payment.PaymentMethod;
+import com.vps.entity.Payment.PaymentStatus;
+import com.vps.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class ParkingService {
+
+    private final ParkingSlotRepository slotRepository;
+    private final ParkingRecordRepository recordRepository;
+    private final PaymentRepository paymentRepository;
+    private final RateScheduleRepository rateScheduleRepository;
+    private final VehicleRepository vehicleRepository;
+    private final VehicleService vehicleService;
+    private final AuditLogService auditLogService;
+    private final ReservationRepository reservationRepository;
+
+<span class="fc" id="L38">    private static final AtomicLong ticketCounter = new AtomicLong(1);</span>
+
+    // ---------------------------------------------------------------
+    // VPS-F-004: Slot availability
+    // ---------------------------------------------------------------
+
+    public List&lt;ParkingSlotResponse&gt; getAllSlots() {
+<span class="fc" id="L45">        return slotRepository.findAll().stream()</span>
+<span class="fc" id="L46">                .map(this::toSlotResponse)</span>
+<span class="fc" id="L47">                .collect(Collectors.toList());</span>
+    }
+
+    public List&lt;ParkingSlotResponse&gt; getAvailableSlots() {
+<span class="fc" id="L51">        LocalDateTime now = LocalDateTime.now();</span>
+
+<span class="fc" id="L53">        return slotRepository.findByStatus(SlotStatus.AVAILABLE).stream()</span>
+<span class="fc" id="L54">                .filter(slot -&gt; !reservationRepository</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                        .isSlotReservedAtTime(slot.getId(), now))</span>
+<span class="fc" id="L56">                .map(this::toSlotResponse)</span>
+<span class="fc" id="L57">                .collect(Collectors.toList());</span>
+    }
+
+    // ---------------------------------------------------------------
+    // VPS-F-005: Slot management (staff/admin)
+    // ---------------------------------------------------------------
+
+    @Transactional
+    public ParkingSlotResponse createSlot(ParkingSlotRequest request) {
+<span class="fc" id="L66">        if (slotRepository.findAll().stream()</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                .anyMatch(s -&gt; s.getSlotNumber()</span>
+<span class="fc" id="L68">                        .equalsIgnoreCase(request.getSlotNumber()))) {</span>
+<span class="fc" id="L69">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L70">                    &quot;Slot number already exists: &quot; + request.getSlotNumber());</span>
+        }
+
+<span class="fc" id="L73">        ParkingSlot slot = new ParkingSlot();</span>
+<span class="fc" id="L74">        slot.setSlotNumber(request.getSlotNumber().toUpperCase());</span>
+<span class="fc" id="L75">        slot.setSlotType(request.getSlotType());</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        slot.setFloor(request.getFloor() != null ? request.getFloor() : &quot;G&quot;);</span>
+<span class="fc" id="L77">        slot.setStatus(SlotStatus.AVAILABLE);</span>
+
+        try {
+<span class="fc" id="L80">            slotRepository.save(slot);</span>
+<span class="nc" id="L81">        } catch (DataIntegrityViolationException ex) {</span>
+<span class="nc" id="L82">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L83">                    &quot;Slot number already exists: &quot; + request.getSlotNumber());</span>
+<span class="fc" id="L84">        }</span>
+
+<span class="fc" id="L86">        return toSlotResponse(slot);</span>
+    }
+
+    @Transactional
+    public ParkingSlotResponse updateSlot(
+            Long slotId, ParkingSlotRequest request) {
+
+<span class="fc" id="L93">        ParkingSlot slot = slotRepository.findById(slotId)</span>
+<span class="pc" id="L94">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                        &quot;Slot not found: &quot; + slotId));
+
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (request.getSlotType() != null) {</span>
+<span class="fc" id="L98">            slot.setSlotType(request.getSlotType());</span>
+        }
+
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (request.getFloor() != null) {</span>
+<span class="fc" id="L102">            slot.setFloor(request.getFloor());</span>
+        }
+
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (request.getStatus() != null</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                &amp;&amp; !request.getStatus().isBlank()) {</span>
+<span class="fc" id="L107">            slot.setStatus(</span>
+<span class="fc" id="L108">                    SlotStatus.valueOf(request.getStatus().toUpperCase()));</span>
+        }
+
+<span class="fc" id="L111">        slotRepository.save(slot);</span>
+
+<span class="fc" id="L113">        return toSlotResponse(slot);</span>
+    }
+
+    @Transactional
+    public void deactivateSlot(Long slotId) {
+<span class="nc" id="L118">        ParkingSlot slot = slotRepository.findById(slotId)</span>
+<span class="nc" id="L119">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                        &quot;Slot not found: &quot; + slotId));
+
+<span class="nc" id="L122">        slot.setStatus(SlotStatus.OUT_OF_SERVICE);</span>
+<span class="nc" id="L123">        slotRepository.save(slot);</span>
+<span class="nc" id="L124">    }</span>
+
+    // ---------------------------------------------------------------
+    // VPS-F-001 to VPS-F-003: Vehicle entry
+    // ---------------------------------------------------------------
+
+    @Transactional
+    public ParkingEntryResponse processEntry(
+            ParkingEntryRequest request, User actor) {
+
+<span class="fc" id="L134">        String plate = request.getLicensePlate().toUpperCase();</span>
+
+<span class="fc" id="L136">        Vehicle vehicle = vehicleService.getEntityByLicensePlate(plate);</span>
+
+        // Customers may park only vehicles they own.
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (actor.getRole() == User.Role.CUSTOMER</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                &amp;&amp; !vehicle.getUser().getId().equals(actor.getId())) {</span>
+<span class="fc" id="L141">            throw new SecurityException(</span>
+                    &quot;You can only park your own vehicle&quot;);
+        }
+
+        // Prevent duplicate active parking sessions.
+<span class="fc" id="L146">        if (recordRepository.findByVehicleIdAndStatus(</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                vehicle.getId(), RecordStatus.ACTIVE).isPresent()) {</span>
+<span class="fc" id="L148">            throw new IllegalStateException(</span>
+                    &quot;Vehicle &quot; + plate + &quot; is already parked&quot;);
+        }
+
+        // Select an available slot while respecting reservations.
+<span class="fc" id="L153">        SlotType preferredType = parseSlotType(request.getSlotType());</span>
+<span class="fc" id="L154">        LocalDateTime entryTime = LocalDateTime.now();</span>
+
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        List&lt;ParkingSlot&gt; preferredCandidates = preferredType != null</span>
+<span class="fc" id="L157">                ? slotRepository.findByStatusAndSlotType(</span>
+                        SlotStatus.AVAILABLE, preferredType)
+<span class="fc" id="L159">                : List.of();</span>
+
+<span class="fc" id="L161">        List&lt;ParkingSlot&gt; allAvailable =</span>
+<span class="fc" id="L162">                slotRepository.findByStatus(SlotStatus.AVAILABLE);</span>
+
+<span class="fc" id="L164">        ParkingSlot slot = java.util.stream.Stream.concat(</span>
+<span class="fc" id="L165">                        preferredCandidates.stream(),</span>
+<span class="fc" id="L166">                        allAvailable.stream().filter(s -&gt;</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                                preferredType == null</span>
+<span class="pc bnc" id="L168" title="All 2 branches missed.">                                        || s.getSlotType() != preferredType))</span>
+<span class="fc" id="L169">                .filter(s -&gt; !reservationRepository</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                        .isSlotReservedAtTime(s.getId(), entryTime))</span>
+<span class="fc" id="L171">                .findFirst()</span>
+<span class="fc" id="L172">                .orElseThrow(() -&gt; new IllegalStateException(</span>
+                        &quot;Parking is full or all available slots are reserved for this time.&quot;));
+
+        // Mark the selected slot occupied.
+<span class="fc" id="L176">        slot.setStatus(SlotStatus.OCCUPIED);</span>
+<span class="fc" id="L177">        slotRepository.save(slot);</span>
+
+        // Create the parking record.
+<span class="fc" id="L180">        ParkingRecord record = new ParkingRecord();</span>
+<span class="fc" id="L181">        record.setTicketId(generateTicketId());</span>
+<span class="fc" id="L182">        record.setVehicle(vehicle);</span>
+<span class="fc" id="L183">        record.setSlot(slot);</span>
+<span class="fc" id="L184">        record.setEntryTime(entryTime);</span>
+<span class="fc" id="L185">        record.setStatus(RecordStatus.ACTIVE);</span>
+<span class="fc" id="L186">        record.setEntryTerminal(request.getCaptureMethod());</span>
+<span class="fc" id="L187">        recordRepository.save(record);</span>
+
+<span class="fc" id="L189">        auditLogService.log(</span>
+                actor,
+                &quot;VEHICLE_ENTRY&quot;,
+                &quot;PARKING_RECORD&quot;,
+<span class="fc" id="L193">                record.getId(),</span>
+<span class="fc" id="L194">                &quot;Entry: &quot; + plate + &quot; -&gt; Slot &quot; + slot.getSlotNumber()</span>
+<span class="fc" id="L195">                        + &quot; Ticket: &quot; + record.getTicketId());</span>
+
+<span class="fc" id="L197">        ParkingEntryResponse resp = new ParkingEntryResponse();</span>
+<span class="fc" id="L198">        resp.setTicketId(record.getTicketId());</span>
+<span class="fc" id="L199">        resp.setLicensePlate(plate);</span>
+<span class="fc" id="L200">        resp.setSlotNumber(slot.getSlotNumber());</span>
+<span class="fc" id="L201">        resp.setSlotType(slot.getSlotType().name());</span>
+<span class="fc" id="L202">        resp.setEntryTime(record.getEntryTime());</span>
+<span class="fc" id="L203">        resp.setStatus(&quot;ENTRY_SUCCESS&quot;);</span>
+<span class="fc" id="L204">        resp.setMessage(</span>
+                &quot;Vehicle entry recorded. Slot &quot;
+<span class="fc" id="L206">                        + slot.getSlotNumber() + &quot; assigned.&quot;);</span>
+
+<span class="fc" id="L208">        return resp;</span>
+    }
+
+    // ---------------------------------------------------------------
+    // VPS-F-007 to VPS-F-010: Vehicle exit, fee and payment
+    // ---------------------------------------------------------------
+
+    @Transactional
+    public ParkingExitResponse processExit(
+            ParkingExitRequest request, User actor) {
+
+<span class="fc" id="L219">        ParkingRecord record = recordRepository</span>
+<span class="fc" id="L220">                .findByTicketId(request.getTicketId())</span>
+<span class="fc" id="L221">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="fc" id="L222">                        &quot;Ticket not found: &quot; + request.getTicketId()));</span>
+
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (record.getStatus() != RecordStatus.ACTIVE) {</span>
+<span class="fc" id="L225">            throw new IllegalStateException(</span>
+<span class="fc" id="L226">                    &quot;Ticket &quot; + request.getTicketId()</span>
+                            + &quot; is already completed or cancelled&quot;);
+        }
+
+        // Customers may exit only their own parking sessions.
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (actor.getRole() == User.Role.CUSTOMER</span>
+<span class="fc" id="L232">                &amp;&amp; !record.getVehicle().getUser().getId()</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                        .equals(actor.getId())) {</span>
+<span class="fc" id="L234">            throw new SecurityException(</span>
+                    &quot;You can only process exit for your own vehicle&quot;);
+        }
+
+<span class="fc" id="L238">        LocalDateTime exitTime = LocalDateTime.now();</span>
+<span class="fc" id="L239">        long minutes = ChronoUnit.MINUTES.between(</span>
+<span class="fc" id="L240">                record.getEntryTime(), exitTime);</span>
+
+<span class="fc" id="L242">        BigDecimal fee = calculateFee(</span>
+<span class="fc" id="L243">                record.getVehicle().getVehicleType(), minutes);</span>
+
+        // Mock payment processing for the academic project.
+<span class="fc" id="L246">        PaymentMethod method = PaymentMethod.valueOf(</span>
+<span class="fc" id="L247">                request.getPaymentMethod().toUpperCase());</span>
+
+<span class="fc" id="L249">        Payment payment = new Payment();</span>
+<span class="fc" id="L250">        payment.setParkingRecord(record);</span>
+<span class="fc" id="L251">        payment.setAmount(fee);</span>
+<span class="fc" id="L252">        payment.setPaymentMethod(method);</span>
+<span class="fc" id="L253">        payment.setPaymentStatus(PaymentStatus.SUCCESS);</span>
+<span class="fc" id="L254">        payment.setTransactionRef(&quot;TXN-&quot; + System.currentTimeMillis());</span>
+<span class="fc" id="L255">        payment.setPaidAt(exitTime);</span>
+<span class="fc" id="L256">        paymentRepository.save(payment);</span>
+
+        // Update the parking record.
+<span class="fc" id="L259">        record.setExitTime(exitTime);</span>
+<span class="fc" id="L260">        record.setDurationMinutes((int) minutes);</span>
+<span class="fc" id="L261">        record.setFeeAmount(fee);</span>
+<span class="fc" id="L262">        record.setStatus(RecordStatus.COMPLETED);</span>
+<span class="fc" id="L263">        recordRepository.save(record);</span>
+
+        // Release the parking slot.
+<span class="fc" id="L266">        ParkingSlot slot = record.getSlot();</span>
+<span class="fc" id="L267">        slot.setStatus(SlotStatus.AVAILABLE);</span>
+<span class="fc" id="L268">        slotRepository.save(slot);</span>
+
+<span class="fc" id="L270">        auditLogService.log(</span>
+                actor,
+                &quot;VEHICLE_EXIT&quot;,
+                &quot;PARKING_RECORD&quot;,
+<span class="fc" id="L274">                record.getId(),</span>
+<span class="fc" id="L275">                &quot;Exit: &quot; + record.getVehicle().getLicensePlate()</span>
+                        + &quot; Duration: &quot; + minutes + &quot;min Fee: &quot; + fee);
+
+<span class="fc" id="L278">        String receiptId = &quot;RCP-&quot; + record.getTicketId();</span>
+
+<span class="fc" id="L280">        ParkingExitResponse resp = new ParkingExitResponse();</span>
+<span class="fc" id="L281">        resp.setTicketId(record.getTicketId());</span>
+<span class="fc" id="L282">        resp.setLicensePlate(record.getVehicle().getLicensePlate());</span>
+<span class="fc" id="L283">        resp.setSlotNumber(slot.getSlotNumber());</span>
+<span class="fc" id="L284">        resp.setEntryTime(record.getEntryTime());</span>
+<span class="fc" id="L285">        resp.setExitTime(exitTime);</span>
+<span class="fc" id="L286">        resp.setDurationMinutes((int) minutes);</span>
+<span class="fc" id="L287">        resp.setFeeAmount(fee);</span>
+<span class="fc" id="L288">        resp.setCurrency(&quot;INR&quot;);</span>
+<span class="fc" id="L289">        resp.setPaymentMethod(method.name());</span>
+<span class="fc" id="L290">        resp.setPaymentStatus(&quot;SUCCESS&quot;);</span>
+<span class="fc" id="L291">        resp.setReceiptId(receiptId);</span>
+<span class="fc" id="L292">        resp.setMessage(</span>
+                &quot;Exit processed successfully. Receipt: &quot; + receiptId);
+
+<span class="fc" id="L295">        return resp;</span>
+    }
+
+    // ---------------------------------------------------------------
+    // Parking history
+    // ---------------------------------------------------------------
+
+    public List&lt;ParkingHistoryResponse&gt; getParkingHistory(Long vehicleId) {
+<span class="nc" id="L303">        return recordRepository</span>
+<span class="nc" id="L304">                .findByVehicleIdOrderByEntryTimeDesc(vehicleId)</span>
+<span class="nc" id="L305">                .stream()</span>
+<span class="nc" id="L306">                .map(this::toHistoryResponse)</span>
+<span class="nc" id="L307">                .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Ownership-aware vehicle history lookup.
+     * Customers may only see history for their own vehicle.
+     */
+    public List&lt;ParkingHistoryResponse&gt; getParkingHistory(
+            Long vehicleId, User requester) {
+
+<span class="fc" id="L317">        Vehicle vehicle = vehicleRepository.findById(vehicleId)</span>
+<span class="pc" id="L318">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                        &quot;Vehicle not found: &quot; + vehicleId));
+
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (requester.getRole() == User.Role.CUSTOMER</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                &amp;&amp; !vehicle.getUser().getId().equals(requester.getId())) {</span>
+<span class="fc" id="L323">            throw new SecurityException(</span>
+                    &quot;Not authorized to view history for this vehicle&quot;);
+        }
+
+<span class="fc" id="L327">        return recordRepository</span>
+<span class="fc" id="L328">                .findByVehicleIdOrderByEntryTimeDesc(vehicleId)</span>
+<span class="fc" id="L329">                .stream()</span>
+<span class="fc" id="L330">                .map(this::toHistoryResponse)</span>
+<span class="fc" id="L331">                .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Get all parking history for a specific user across their vehicles.
+     */
+    public List&lt;ParkingHistoryResponse&gt; getParkingHistoryForUser(Long userId) {
+<span class="fc" id="L338">        return recordRepository</span>
+<span class="fc" id="L339">                .findByVehicleUserIdOrderByEntryTimeDesc(userId)</span>
+<span class="fc" id="L340">                .stream()</span>
+<span class="fc" id="L341">                .map(this::toHistoryResponse)</span>
+<span class="fc" id="L342">                .collect(Collectors.toList());</span>
+    }
+
+    /**
+     * Get active parking sessions for a user.
+     */
+    public List&lt;ParkingHistoryResponse&gt; getActiveSessionsForUser(Long userId) {
+<span class="fc" id="L349">        return recordRepository</span>
+<span class="fc" id="L350">                .findActiveByVehicleUserIdOrderByEntryTimeDesc(userId)</span>
+<span class="fc" id="L351">                .stream()</span>
+<span class="fc" id="L352">                .map(this::toHistoryResponse)</span>
+<span class="fc" id="L353">                .collect(Collectors.toList());</span>
+    }
+
+    public List&lt;ParkingHistoryResponse&gt; getAllParkingHistory() {
+<span class="nc" id="L357">        return recordRepository</span>
+<span class="nc" id="L358">                .findByStatusOrderByEntryTimeDesc(RecordStatus.COMPLETED)</span>
+<span class="nc" id="L359">                .stream()</span>
+<span class="nc" id="L360">                .map(this::toHistoryResponse)</span>
+<span class="nc" id="L361">                .collect(Collectors.toList());</span>
+    }
+
+    // ---------------------------------------------------------------
+    // Fee calculation — VPS-F-007
+    // ---------------------------------------------------------------
+
+    private BigDecimal calculateFee(
+            Vehicle.VehicleType vehicleType, long durationMinutes) {
+
+<span class="fc" id="L371">        RateSchedule rate = rateScheduleRepository</span>
+<span class="fc" id="L372">                .findFirstByVehicleTypeAndIsActiveTrue(vehicleType)</span>
+<span class="pc" id="L373">                .orElseThrow(() -&gt; new IllegalStateException(</span>
+                        &quot;No rate schedule found for vehicle type: &quot;
+                                + vehicleType));
+
+<span class="fc" id="L377">        long billableMinutes = Math.max(</span>
+<span class="fc" id="L378">                0, durationMinutes - rate.getGracePeriodMinutes());</span>
+
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (billableMinutes == 0) {</span>
+<span class="fc" id="L381">            return BigDecimal.ZERO;</span>
+        }
+
+<span class="fc" id="L384">        BigDecimal ratePerMinute = rate.getRatePerHour()</span>
+<span class="fc" id="L385">                .divide(BigDecimal.valueOf(60), 4, RoundingMode.HALF_UP);</span>
+
+<span class="fc" id="L387">        return ratePerMinute</span>
+<span class="fc" id="L388">                .multiply(BigDecimal.valueOf(billableMinutes))</span>
+<span class="fc" id="L389">                .setScale(2, RoundingMode.HALF_UP);</span>
+    }
+
+    // ---------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------
+
+    private String generateTicketId() {
+<span class="fc" id="L397">        String date = LocalDateTime.now()</span>
+<span class="fc" id="L398">                .format(DateTimeFormatter.ofPattern(&quot;yyyyMMdd&quot;));</span>
+
+<span class="fc" id="L400">        return &quot;TKT-&quot; + date + &quot;-&quot;</span>
+<span class="fc" id="L401">                + String.format(&quot;%05d&quot;, ticketCounter.getAndIncrement());</span>
+    }
+
+    private SlotType parseSlotType(String slotType) {
+<span class="pc bpc" id="L405" title="1 of 4 branches missed.">        if (slotType == null || slotType.isBlank()) {</span>
+<span class="fc" id="L406">            return null;</span>
+        }
+
+        try {
+<span class="fc" id="L410">            return SlotType.valueOf(slotType.toUpperCase());</span>
+<span class="nc" id="L411">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L412">            return null;</span>
+        }
+    }
+
+    private ParkingSlotResponse toSlotResponse(ParkingSlot slot) {
+<span class="fc" id="L417">        ParkingSlotResponse response = new ParkingSlotResponse();</span>
+<span class="fc" id="L418">        response.setId(slot.getId());</span>
+<span class="fc" id="L419">        response.setSlotNumber(slot.getSlotNumber());</span>
+<span class="fc" id="L420">        response.setSlotType(slot.getSlotType());</span>
+<span class="fc" id="L421">        response.setStatus(slot.getStatus());</span>
+<span class="fc" id="L422">        response.setFloor(slot.getFloor());</span>
+<span class="fc" id="L423">        return response;</span>
+    }
+
+    /** Public wrapper for AdminService to reuse the history mapper. */
+    public ParkingHistoryResponse toHistoryResponsePublic(ParkingRecord record) {
+<span class="nc" id="L428">        return toHistoryResponse(record);</span>
+    }
+
+    private ParkingHistoryResponse toHistoryResponse(ParkingRecord record) {
+<span class="fc" id="L432">        ParkingHistoryResponse response = new ParkingHistoryResponse();</span>
+<span class="fc" id="L433">        response.setId(record.getId());</span>
+<span class="fc" id="L434">        response.setTicketId(record.getTicketId());</span>
+<span class="fc" id="L435">        response.setLicensePlate(record.getVehicle().getLicensePlate());</span>
+<span class="fc" id="L436">        response.setSlotNumber(record.getSlot().getSlotNumber());</span>
+<span class="fc" id="L437">        response.setEntryTime(record.getEntryTime());</span>
+<span class="fc" id="L438">        response.setExitTime(record.getExitTime());</span>
+<span class="fc" id="L439">        response.setDurationMinutes(record.getDurationMinutes());</span>
+<span class="fc" id="L440">        response.setFeeAmount(record.getFeeAmount());</span>
+<span class="fc" id="L441">        response.setStatus(record.getStatus().name());</span>
+
+<span class="fc" id="L443">        paymentRepository.findByParkingRecordId(record.getId()).ifPresent(payment -&gt; {</span>
+<span class="nc" id="L444">            response.setPaymentMethod(payment.getPaymentMethod().name());</span>
+<span class="nc" id="L445">            response.setPaymentStatus(payment.getPaymentStatus().name());</span>
+<span class="nc" id="L446">        });</span>
+
+<span class="fc" id="L448">        return response;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
