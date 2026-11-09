@@ -125,8 +125,39 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>-Dnet.bytebuddy.experimental=true</argLine>
+                    <argLine>@{argLine} -Dnet.bytebuddy.experimental=true</argLine>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <configuration>
+                    <excludes>
+                        <!-- Exclude application entry point, configs, and models/DTOs from skewing test metrics -->
+                        <exclude>**/VpsBackendApplication.*</exclude>
+                        <exclude>com/vps/config/**</exclude>
+                        <exclude>com/vps/dto/**</exclude>
+                        <exclude>com/vps/entity/**</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <!-- Attaches JaCoCo agent to the Surefire test JVM -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <!-- Generates reports immediately after tests complete -->
+                    <execution>
+                        <id>generate-report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

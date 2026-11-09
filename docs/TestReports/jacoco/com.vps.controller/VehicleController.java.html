@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VehicleController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Vehicle Parking System - Backend</a> &gt; <a href="index.source.html" class="el_package">com.vps.controller</a> &gt; <span class="el_source">VehicleController.java</span></div><h1>VehicleController.java</h1><pre class="source lang-java linenums">package com.vps.controller;
+
+import com.vps.dto.ApiResponse;
+import com.vps.dto.VehicleRequest;
+import com.vps.dto.VehicleResponse;
+import com.vps.entity.User;
+import com.vps.service.AuthService;
+import com.vps.service.VehicleService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/v1/vehicles&quot;)
+@RequiredArgsConstructor
+public class VehicleController {
+
+    private final VehicleService vehicleService;
+    private final AuthService authService;
+
+    // POST /api/v1/vehicles
+    @PostMapping
+    public ResponseEntity&lt;ApiResponse&lt;VehicleResponse&gt;&gt; addVehicle(
+            @Valid @RequestBody VehicleRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+<span class="fc" id="L32">        User user = authService.getUserByEmail(userDetails.getUsername());</span>
+<span class="fc" id="L33">        VehicleResponse response = vehicleService.addVehicle(request, user);</span>
+<span class="fc" id="L34">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L35">                .body(ApiResponse.success(&quot;Vehicle added successfully&quot;, response));</span>
+    }
+
+    // GET /api/v1/vehicles — admin sees all, customer sees own
+    @GetMapping
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;VehicleResponse&gt;&gt;&gt; getVehicles(
+            @AuthenticationPrincipal UserDetails userDetails) {
+<span class="fc" id="L42">        User user = authService.getUserByEmail(userDetails.getUsername());</span>
+        List&lt;VehicleResponse&gt; vehicles;
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (user.getRole() == User.Role.ADMINISTRATOR</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                || user.getRole() == User.Role.PARKING_ATTENDANT) {</span>
+<span class="nc" id="L46">            vehicles = vehicleService.getAllVehicles();</span>
+        } else {
+<span class="fc" id="L48">            vehicles = vehicleService.getVehiclesForUser(user.getId());</span>
+        }
+<span class="fc" id="L50">        return ResponseEntity.ok(ApiResponse.success(&quot;Vehicles retrieved&quot;, vehicles));</span>
+    }
+
+    // GET /api/v1/vehicles/{id}
+    @GetMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;VehicleResponse&gt;&gt; getVehicle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+<span class="fc" id="L58">        User user = authService.getUserByEmail(userDetails.getUsername());</span>
+<span class="fc" id="L59">        VehicleResponse vehicle = vehicleService.getVehicleById(id, user);</span>
+<span class="fc" id="L60">        return ResponseEntity.ok(ApiResponse.success(&quot;Vehicle retrieved&quot;, vehicle));</span>
+    }
+
+    // GET /api/v1/vehicles/search?plate=KA01AB1234
+    @GetMapping(&quot;/search&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;VehicleResponse&gt;&gt; searchByPlate(
+            @RequestParam String plate,
+            @AuthenticationPrincipal UserDetails userDetails) {
+<span class="fc" id="L68">        User user = authService.getUserByEmail(userDetails.getUsername());</span>
+<span class="fc" id="L69">        VehicleResponse vehicle = vehicleService.getByLicensePlate(plate, user);</span>
+<span class="fc" id="L70">        return ResponseEntity.ok(ApiResponse.success(&quot;Vehicle found&quot;, vehicle));</span>
+    }
+
+    // PUT /api/v1/vehicles/{id}
+    @PutMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;VehicleResponse&gt;&gt; updateVehicle(
+            @PathVariable Long id,
+            @Valid @RequestBody VehicleRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+<span class="nc" id="L79">        User user = authService.getUserByEmail(userDetails.getUsername());</span>
+<span class="nc" id="L80">        VehicleResponse response = vehicleService.updateVehicle(id, request, user);</span>
+<span class="nc" id="L81">        return ResponseEntity.ok(ApiResponse.success(&quot;Vehicle updated&quot;, response));</span>
+    }
+
+    // DELETE /api/v1/vehicles/{id}
+    @DeleteMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; deleteVehicle(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+<span class="fc" id="L89">        User user = authService.getUserByEmail(userDetails.getUsername());</span>
+<span class="nc" id="L90">        vehicleService.deactivateVehicle(id, user);</span>
+<span class="nc" id="L91">        return ResponseEntity.ok(ApiResponse.success(&quot;Vehicle deactivated&quot;, null));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

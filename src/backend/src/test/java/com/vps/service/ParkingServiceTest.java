@@ -4,6 +4,8 @@ import com.vps.dto.ParkingEntryRequest;
 import com.vps.dto.ParkingEntryResponse;
 import com.vps.dto.ParkingExitRequest;
 import com.vps.dto.ParkingExitResponse;
+import com.vps.dto.ParkingSlotRequest;
+import com.vps.dto.ParkingSlotResponse;
 import com.vps.entity.*;
 import com.vps.entity.ParkingRecord.RecordStatus;
 import com.vps.entity.ParkingSlot.SlotStatus;
@@ -24,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -453,5 +456,110 @@ class ParkingServiceTest {
         var result = parkingService.getParkingHistory(10L, attendant);
 
         assertThat(result).isNotNull();
+    }
+
+    @Test
+    void updateSlot_WithValidFields_UpdatesAllFields() {
+        ParkingSlot existingSlot = new ParkingSlot();
+        existingSlot.setId(1L);
+        existingSlot.setSlotNumber("A-101");
+        existingSlot.setSlotType(ParkingSlot.SlotType.REGULAR);
+        existingSlot.setFloor("1");
+        existingSlot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
+
+        when(slotRepository.findById(1L)).thenReturn(Optional.of(existingSlot));
+        when(slotRepository.save(any(ParkingSlot.class))).thenAnswer(i -> i.getArgument(0));
+
+        ParkingSlotRequest request = new ParkingSlotRequest();
+        request.setSlotType(ParkingSlot.SlotType.EV);
+        request.setFloor("2");
+        request.setStatus("OCCUPIED");
+
+        ParkingSlotResponse result = parkingService.updateSlot(1L, request);
+
+        assertEquals(ParkingSlot.SlotType.EV, result.getSlotType());
+        assertEquals("2", result.getFloor());
+        assertEquals(ParkingSlot.SlotStatus.OCCUPIED, result.getStatus());
+    }
+
+    @Test
+    void updateSlot_WithNullFields_DoesNotOverwriteValue() {
+        ParkingSlot existingSlot = new ParkingSlot();
+        existingSlot.setId(1L);
+        existingSlot.setSlotNumber("A-101");
+        existingSlot.setSlotType(ParkingSlot.SlotType.REGULAR);
+        existingSlot.setFloor("1");
+        existingSlot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
+
+        when(slotRepository.findById(1L)).thenReturn(Optional.of(existingSlot));
+        when(slotRepository.save(any(ParkingSlot.class))).thenAnswer(i -> i.getArgument(0));
+
+        ParkingSlotRequest request = new ParkingSlotRequest();
+        request.setSlotType(null);
+        request.setFloor(null);
+        request.setStatus(null);
+
+        ParkingSlotResponse result = parkingService.updateSlot(1L, request);
+
+        assertEquals(ParkingSlot.SlotType.REGULAR, result.getSlotType());
+        assertEquals("1", result.getFloor());
+        assertEquals(ParkingSlot.SlotStatus.AVAILABLE, result.getStatus());
+    }
+
+    @Test
+    void updateSlot_WithBlankStatus_DoesNotUpdateStatus() {
+        ParkingSlot existingSlot = new ParkingSlot();
+        existingSlot.setId(1L);
+        existingSlot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
+
+        when(slotRepository.findById(1L)).thenReturn(Optional.of(existingSlot));
+        when(slotRepository.save(any(ParkingSlot.class))).thenAnswer(i -> i.getArgument(0));
+
+        ParkingSlotRequest request = new ParkingSlotRequest();
+        request.setStatus("   ");
+
+        ParkingSlotResponse result = parkingService.updateSlot(1L, request);
+
+        assertEquals(ParkingSlot.SlotStatus.AVAILABLE, result.getStatus());
+    }
+
+    @Test
+    void processExit_AsAdminOrOperator_BypassesCustomerOwnershipCheck() {
+        User admin = new User();
+        admin.setId(99L);
+        admin.setRole(User.Role.ADMINISTRATOR);
+
+        User vehicleOwner = new User();
+        vehicleOwner.setId(1L);
+
+        Vehicle custVehicle = new Vehicle();
+        custVehicle.setId(10L);
+        custVehicle.setLicensePlate("KA01AB1234");
+        custVehicle.setVehicleType(VehicleType.CAR);
+        custVehicle.setUser(vehicleOwner);
+
+        ParkingSlot activeSlot = new ParkingSlot();
+        activeSlot.setId(5L);
+        activeSlot.setSlotNumber("A-01");
+        activeSlot.setSlotType(ParkingSlot.SlotType.REGULAR);
+        activeSlot.setStatus(SlotStatus.OCCUPIED);
+
+        ParkingRecord record = new ParkingRecord();
+        record.setId(10L);
+        record.setTicketId("TKT-20261022-00099");
+        record.setVehicle(custVehicle);
+        record.setSlot(activeSlot);
+        record.setEntryTime(LocalDateTime.now().minusHours(1));
+        record.setStatus(RecordStatus.ACTIVE);
+
+        when(recordRepository.findByTicketId("TKT-20261022-00099")).thenReturn(Optional.of(record));
+        when(rateScheduleRepository.findFirstByVehicleTypeAndIsActiveTrue(VehicleType.CAR))
+                .thenReturn(Optional.of(rate));
+
+        ParkingExitRequest exitReq = new ParkingExitRequest();
+        exitReq.setTicketId("TKT-20261022-00099");
+        exitReq.setPaymentMethod("CASH");
+
+        assertDoesNotThrow(() -> parkingService.processExit(exitReq, admin));
     }
 }
