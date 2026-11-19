@@ -4,8 +4,8 @@
 |---|---|
 | **Project** | Vehicle Parking System (VPS) |
 | **Team** | Team 10 |
-| **Version** | 2.0 |
-| **Status** | In Progress |
+| **Version** | 3.0 |
+| **Status** | Completed |
 | **Repository** | [GitHub](https://github.com/Thrupthi-AM476/Project-Team-10) |
 
 ## Project Description
