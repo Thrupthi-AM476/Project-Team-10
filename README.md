@@ -228,5 +228,4 @@ npm run build
 
 - Payment processing is simulated (no real payment gateway integration)
 - ALPR (Automatic License Plate Recognition) is not integrated; plates are entered manually
-- Report export is available via API (CSV/PDF export not yet implemented)
 - Reservation auto-expiry requires manual triggering via the `/reservations/expire` endpoint
